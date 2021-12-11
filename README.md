@@ -18,7 +18,7 @@ The jet samples are located in the `training_data` folder.
 
 The analysis workflow is as follows:
 
-1. Edit the config file `config/qg/yaml`. In particular:
+1. Edit the config file `config/qg.yaml`. In particular:
     - Set `n_train, n_val, n_test` to the desired size of the training sample
     - Set `models` to contain the ML architectures you want to include
     - Edit the config blocks for each model as desired
@@ -26,7 +26,7 @@ The analysis workflow is as follows:
 2. Fit model and make plots:
    ```
    cd ml-eic-flavor
-   python analyze_flavor.py -c <config> -o <output_dir>
+   python analysis/analyze_flavor.py -c config/qg.yaml -o <output_dir>
    ```
    The `-o` path is the location that the output plots will be written to. 
 
