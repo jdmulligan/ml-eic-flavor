@@ -1,16 +1,37 @@
 # Running the code
 
-## Set up software environment
+## Setup software environment – on hiccup cluster
+Logon to hiccup:
+```
+ssh <user>@hic.lbl.gov
+```
 
-Initialize a python environment with the packages listed in Pipfile. For example:
+First, request an interactive node from the slurm batch system:
+   ```
+   srun -N 1 -n 20 -t 2:00:00 -p quick --pty bash
+   ``` 
+   which requests 1 full node (20 cores) for 2 hours in the `quick` queue. You can choose the time and queue: you can use the `quick` partition for up to a 2 hour session, `std` for a 24 hour session, or `long` for a 72 hour session – but you will wait longer for the longer queues). 
+Depending how busy the squeue is, you may get the node instantly, or you may have to wait awhile.
+When you’re done with your session, just type `exit`.
+Please do not run anything bust the lightest tests on the login node. If you are finding that you have to wait a long time, let us know and we can take a node out of the slurm queue and logon to it directly.
+
+Then initialize a python environment with the packages listed in Pipfile:
 ```
 cd ml-eic-flavor
-pipenv install                                # (this step is only needed the first time)
+pipenv install         # (this step is only needed the first time)
 pipenv shell
 ```
 
-The setup was designed to run on hiccup -- some modifications to the python setup might be needed if running elsewhere. 
-Please note that one should not run anything other than very quick small scripts on hiccup0 -- for more substantial runs like with the full ML training statistics you should `ssh hiccup1` and let James know in order to make sure we don't overload a node.
+Finally, load some modules that we will need
+```
+module use /software/users/james/heppy/modules
+module load heppy/1.0
+module list
+```
+
+Now we are ready to run our scripts.
+
+Note that the setup above is designed to run on hiccup – some modifications to the python setup might be needed if running elsewhere. 
 
 ## q-g jets from Kyle
 
