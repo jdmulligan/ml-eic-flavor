@@ -10,12 +10,12 @@ q_label: 'quark'
 g_label: 'gluon'
 
 # Load labeled data
-n_train: 1500
-n_val: 300
-n_test: 300
+n_train: 15000
+n_val: 3000
+n_test: 3000
 
 # Select model: pfn, efn, efp_linear, efp_lasso, efp_dnn
-models: [efp_linear]
+models: [pfn, efn, efp_linear, efp_dnn]
 
 # efp parameters
 dmax: 5                                             # maximal degree of the EFPs
@@ -28,7 +28,7 @@ efp_dnn:
     loss: 'binary_crossentropy'                     # loss function - use categorical_crossentropy instead ?
     metrics: ['accuracy']                           # measure accuracy during training
     batch_size: 1000                    
-    epochs: 30                                      # number of training epochs
+    epochs: 10                                      # number of training epochs
 
 efp_linear:
 

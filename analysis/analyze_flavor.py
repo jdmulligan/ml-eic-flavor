@@ -815,10 +815,10 @@ class AnalyzePPAA(common_base.CommonBase):
             x_PFN[mask,0] /= x_PFN[:,0].sum()
         
         # Handle particle id channel
-        if model_settings['use_pids']:
-            self.my_remap_pids(X_PFN)
-        else:
-            X_PFN = X_PFN[:,:,:3]
+        #if model_settings['use_pids']:
+        #    self.my_remap_pids(X_PFN)
+        #else:
+        X_PFN = X_PFN[:,:,:3]
         
         # Check shape
         if y.shape[0] != X_PFN.shape[0]:

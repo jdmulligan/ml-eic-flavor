@@ -128,14 +128,11 @@ class PlotFlavor(common_base.CommonBase):
         if 'efp_linear' in self.models and 'efp_lasso' in self.models:
             roc_list = {}
             roc_list[f'EFP (d = {self.d_lasso_efp}), Linear'] = self.roc_curve_dict['efp_linear'][self.d_lasso_efp]
-            roc_list['thrust'] = self.roc_curve_dict_lasso['thrust']
-            roc_list['jet_angularity'] = self.roc_curve_dict_lasso['jet_angularity']
-            roc_list['jet_theta_g'] = self.roc_curve_dict_lasso['jet_theta_g']
-            roc_list['zg'] = self.roc_curve_dict_lasso['zg']
             for alpha in self.efp_alpha_list:
                 roc_list[rf'Lasso $(\alpha = {alpha})$, EFP'] = self.roc_curve_dict_lasso['efp_lasso'][alpha]
+            for kappa in self.kappa:
+                roc_list[f'jet_charge_k{kappa}'] = self.roc_curve_dict[f'jet_charge_k{kappa}']
             self.plot_roc_curves(roc_list, jet_pt_min)
-            self.plot_significance_improvement(roc_list, jet_pt_min)
 
     #--------------------------------------------------------------- 
     # Plot ROC curves
@@ -179,7 +176,7 @@ class PlotFlavor(common_base.CommonBase):
                     label = rf'$\sum_{{G}} c_{{G}} \rm{{EFP}}_{{G}}$'
                 label += f', {n_terms} terms'
 
-            elif 'DNN' in label or 'EFP' in label or 'nsub' in label:
+            elif 'DNN' in label or 'EFP' in label:
                 linewidth = 2
                 alpha = 0.9
                 linestyle = 'solid'
@@ -211,19 +208,19 @@ class PlotFlavor(common_base.CommonBase):
     def color(self, label):
 
         color = None
-        if label in ['PFN', 'PFN_hard', 'EFP (d = 7), Linear']:
+        if label in ['PFN', 'PFN_hard', 'EFP (d = 7), Linear', 'EFP (d = 7), DNN']:
             color = sns.xkcd_rgb['faded purple'] 
         elif label in ['EFN', 'EFN_hard', 'jet_charge_k0']:
             color = sns.xkcd_rgb['faded red']    
-        elif label in ['EFP (d = 6), Linear']:
+        elif label in ['EFP (d = 6), Linear', 'EFP (d = 6), DNN']:
             color = sns.xkcd_rgb['dark sky blue']    
         elif label in ['jet_charge_k0']:
             color = sns.xkcd_rgb['light lavendar']    
-        elif label in ['EFN_background', 'EFP (d = 5), Linear']:
+        elif label in ['EFN_background', 'EFP (d = 5), Linear', 'EFP (d = 5), DNN']:
             color = sns.xkcd_rgb['medium green']  
-        elif label in ['EFP (d = 3), Linear', rf'Lasso $(\alpha = {self.efp_alpha_list[1]})$, EFP']:
+        elif label in ['EFP (d = 3), Linear', 'EFP (d = 3), DNN', rf'Lasso $(\alpha = {self.efp_alpha_list[1]})$, EFP']:
             color = sns.xkcd_rgb['watermelon'] 
-        elif label in ['EFP (d = 4), Linear', rf'Lasso $(\alpha = {self.efp_alpha_list[0]})$, EFP']:
+        elif label in ['EFP (d = 4), Linear', 'EFP (d = 4), DNN', rf'Lasso $(\alpha = {self.efp_alpha_list[0]})$, EFP']:
             color = sns.xkcd_rgb['light brown'] 
         elif label in ['jet_charge_k0.3']:
             color = sns.xkcd_rgb['medium brown']
