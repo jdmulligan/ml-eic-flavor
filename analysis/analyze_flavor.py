@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Example class to read quark-gluon dataset
+Class to read jets from file, train ML models, and plot
 """
 
 import os
@@ -193,19 +193,12 @@ class AnalyzePPAA(common_base.CommonBase):
             if not os.path.exists(self.output_dir_i):
                 os.makedirs(self.output_dir_i)
 
-            # Kyle's IO
-            jetlist = pd.read_csv(self.filename_base.format(jet_pt_min), delimiter="\s+")                                                                                   
-
-            g = jetlist.drop(columns=['qg','ct']).groupby('num').cumcount()                                                                                     
-            L = (jetlist.drop(columns=['qg','ct']).set_index(['num',g])                                                                                         
-                .unstack(fill_value=0)                                                                                                                       
-                .stack().groupby(level=0)                                                                                                                    
-                    .apply(lambda x: x.values.tolist())                                                                                                         
-                    .tolist())                                                                                                                                  
-
-            # First, get the full input arrays
-            X_particles_total = self.createjetarray(L)                                                                                                                            
-            self.y_total = jetlist[jetlist.ct==1]['qg'].to_numpy()
+            # Read input file into dataframe -- the files store the particle info as: (pt, eta, phi, pid)
+            # Then transform these into a 3D numpy array (jets, particles, particle info)
+            # The format of the particle info in X_particles will be: (pt, eta, phi, m, pid, charge)
+            jet_df = pd.read_csv(self.filename_base.format(jet_pt_min), delimiter="\s+")                                                                                                                                                                                                               
+            X_particles_total = self.create_jet_array(jet_df)                                                                                                                            
+            self.y_total = jet_df[jet_df.ct==1]['qg'].to_numpy()
 
             # Determine total number of jets
             total_jets = int(self.y_total.size)
@@ -263,10 +256,12 @@ class AnalyzePPAA(common_base.CommonBase):
                 # TODO: check beta dependence !!
                 efpset = energyflow.EFPSet(('d<=', self.dmax), measure=self.efp_measure, beta=self.efp_beta)
 
-                # Load labels and data, four vectors. Format: (pT,y,phi,m=0). Note: no PID yet which would be 5th entry... check later!
+                # Load labels and data, four vectors. Format: (pT,y,phi,m). 
+                # Note: no PID yet which would be 5th entry... check later!
                 # To make sure, don't need any further preprocessing like for EFNs?
-                X_EFP = self.X_particles
+                X_EFP = self.X_particles[:,:,:4] # Remove pid,charge from self.X_particles
                 Y_EFP = self.y #Note not "to_categorical" here... 
+    
                 # Switch here to Jesse's quark/gluon data set.
                 #X_EFP, self.Y_EFP = energyflow.datasets.qg_jets.load(self.n_train + self.n_val + self.n_test)
                 
@@ -333,18 +328,35 @@ class AnalyzePPAA(common_base.CommonBase):
         subprocess.run(cmd, check=True, shell=True)
 
     #---------------------------------------------------------------
-    # Kyle's IO
+    # Parse the input file into a 3D array (jets, particles, particle info)
+    # The particle info will be stored as: (pt, eta, phi, m, pid, charge)
     #---------------------------------------------------------------
-    def createjetarray(self, df):
-        temp = np.empty((len(df)),dtype=object)
-        for i in range(len(df)):
-            val = len(df[i])
-            #for j in range(len(df[i])):
-                #if np.asarray(df[i])[j][0] == 0.0:
-                    #val = j
-                    #break
-            temp[i] = np.asarray(df[i][0:val])
-        return temp
+    def create_jet_array(self, jet_df):
+
+        # Add columns of mass and charge
+        # Note that some PIDs are not recognized by the energyflow functions (311 -- K0)
+        # TODO: check whether we want to write these as K0L/K0S (for now we set error_on_unknown=False)
+        jet_df['m'] = energyflow.pids2ms(jet_df['pid'], error_on_unknown=False)
+        jet_df['charge'] = energyflow.pids2chrgs(jet_df['pid'], error_on_unknown=False)
+
+        # Switch order: (pt, eta, phi, pid, m, charge) --> (pt, eta, phi, m, pid, charge)
+        columns = list(jet_df.columns)
+        index_pid = columns.index('pid')
+        index_mass = columns.index('m')
+        columns[index_pid], columns[index_mass] = columns[index_mass], columns[index_pid]
+        jet_df = jet_df[columns]
+
+        # Kyle's IO: Get nested list of particle info for each jet, then convert to numpy array
+        # TODO: This could be made more efficient by translating directly into numpy array rather than list
+        g = jet_df.drop(columns=['qg','ct']).groupby('num').cumcount()                                                                                     
+        L = (jet_df.drop(columns=['qg','ct']).set_index(['num',g])                                                                                         
+            .unstack(fill_value=0)                                                                                                                       
+            .stack().groupby(level=0)                                                                                                                    
+                .apply(lambda x: x.values.tolist())                                                                                                         
+                .tolist())    
+        jet_array = np.array(L)
+
+        return jet_array
 
     #---------------------------------------------------------------
     # Compute some individual jet observables
@@ -383,10 +395,6 @@ class AnalyzePPAA(common_base.CommonBase):
             # Deep sets
             if model == 'pfn':
                 self.fit_pfn(model, model_settings, self.y, self.X_particles)
-
-                model_label = 'pfn_min_pt'
-                self.AUC[f'{model_label}{self.key_suffix}'] = []
-                self.fit_pfn(model_label, model_settings, self.y, self.X_particles_min_pt)
                 
             if model == 'efn':
                 self.fit_efn(model, model_settings)
@@ -793,9 +801,9 @@ class AnalyzePPAA(common_base.CommonBase):
         # Convert labels to categorical
         Y_PFN = energyflow.utils.to_categorical(y, num_classes=2)
                         
-        # (pT,y,phi,m=0)
-        X_PFN = X_particles
-        
+        # (pT,y,phi,pid)
+        X_PFN = X_particles[:,:,[0,1,2,4]]
+
         # Preprocess by centering jets and normalizing pts
         for x_PFN in X_PFN:
             mask = x_PFN[:,0] > 0
@@ -803,11 +811,11 @@ class AnalyzePPAA(common_base.CommonBase):
             x_PFN[mask,1:3] -= yphi_avg
             x_PFN[mask,0] /= x_PFN[:,0].sum()
         
-        # Handle particle id channel !! Note: If changed to pT,y,phi,m the 4th component is not PID but m .. fix later
-        #if model_settings['use_pids']:
-        #    self.my_remap_pids(X_PFN)
-        #else:
-        X_PFN = X_PFN[:,:,:3]
+        # Handle particle id channel
+        if model_settings['use_pids']:
+            self.my_remap_pids(X_PFN)
+        else:
+            X_PFN = X_PFN[:,:,:3]
         
         # Check shape
         if y.shape[0] != X_PFN.shape[0]:
@@ -850,8 +858,8 @@ class AnalyzePPAA(common_base.CommonBase):
         # Convert labels to categorical
         Y_EFN = energyflow.utils.to_categorical(self.y, num_classes=2)
                         
-        # (pT,y,phi,m=0)
-        X_EFN = self.X_particles
+        # (pT,y,phi,m)
+        X_EFN = self.X_particles[:,:,:4] # Remove pid,charge from self.X_particles
         
         # Can switch here to quark vs gluon data set
         #X_EFN, y_EFN = energyflow.datasets.qg_jets.load(self.n_train + self.n_val + self.n_test)
