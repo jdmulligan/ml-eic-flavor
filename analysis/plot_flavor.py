@@ -56,6 +56,7 @@ class PlotFlavor(common_base.CommonBase):
           config = yaml.safe_load(stream)
           
         self.jet_pt_min_list = config['jet_pt_min_list']
+        self.kappa = config['kappa']
 
         self.models = config['models']
         self.dmax = config['dmax']
@@ -114,6 +115,8 @@ class PlotFlavor(common_base.CommonBase):
              roc_list = {}
              for d in range(3, self.dmax+1):
                  roc_list[f'EFP (d = {d}), Linear'] = self.roc_curve_dict['efp_linear'][d]
+             for kappa in self.kappa:
+                 roc_list[f'jet_charge_k{kappa}'] = self.roc_curve_dict[f'jet_charge_k{kappa}']
              self.plot_roc_curves(roc_list, jet_pt_min)
 
         if 'efp_dnn' in self.models:
@@ -141,68 +144,29 @@ class PlotFlavor(common_base.CommonBase):
     
         plt.plot([0, 1], [0, 1], 'k--') # dashed diagonal
         plt.axis([0, 1, 0, 1])
-        plt.title('JEWEL vs. PYTHIA8     ' + r'$100<p_{\mathrm{T,jet}}<125\;\mathrm{GeV}$', fontsize=14)
+        plt.title('q vs. g     ' + rf'$p_{{\mathrm{{T,jet}}}}>{jet_pt_min}\;\mathrm{{GeV}}$', fontsize=14)
         if self.plot_title:
             plt.title(rf'$p_T min = {jet_pt_min}$', fontsize=14)
-        plt.xlabel('False AA Rate', fontsize=16)
-        plt.ylabel('True AA Rate', fontsize=16)
-        #plt.ylabel(rf'$\varepsilon_{{\rm{{true positive}} }}^{{\rm{{AA}} }}$', fontsize=16)
+        plt.xlabel('False q Rate', fontsize=16)
+        plt.ylabel('True q Rate', fontsize=16)
         plt.grid(True)
     
         for label,value in roc_list.items():
             index=0
-            if label in ['PFN', 'EFN', 'jet_mass', 'jet_angularity', 'LHA', 'thrust', 'pTD', 'hadron_z', 'zg', 'jet_theta_g'] or 'multiplicity' in label or 'PFN' in label or 'EFN' in label or 'pfn' in label:
+            if label in ['PFN', 'EFN', 'pfn'] or 'jet_charge' in label:
                 linewidth = 4
                 alpha = 0.5
                 linestyle = self.linestyle(label)
                 color=self.color(label)
                 legend_fontsize = 12
-                if label == 'jet_mass':
-                    label = r'$m_{\mathrm{jet}}$'
-                if label == 'jet_angularity':
-                    label = r'$\lambda_1$ (girth)'
-                    linewidth = 2
-                    alpha = 0.6
-                if label == 'thrust':
-                    label = r'$\lambda_2$ (thrust)'
-                    linewidth = 2
-                    alpha = 0.6
-                if label == 'jet_theta_g':
-                    label = r'$\theta_{\mathrm{g}}$'
-                    linewidth = 2
-                    alpha = 0.6
-                if label == 'zg':
-                    label = r'$z_{\mathrm{g}}$'
+                if 'jet_charge' in label:
+                    label = label
                     linewidth = 2
                     alpha = 0.6
                 if label == 'PFN':
                     label = 'Particle Flow Network'
                 if label == 'EFN':
                     label = 'Energy Flow Network'
-                if label == 'PFN_hard':
-                    label = 'Jet'
-                if label == 'PFN_hard_min_pt':
-                    label = rf'Jet, $p_{{ \rm{{T}} }}^{{ \rm{{particle}} }} > 1$ GeV'
-                    alpha = 0.6
-                    linewidth = 2
-                if label == 'PFN_background':
-                    label = 'Jet + Background'
-                if label == 'PFN_background_min_pt':
-                    label = rf'Jet + Background, $p_{{ \rm{{T}} }}^{{ \rm{{particle}} }} > 1$ GeV'
-                    alpha = 0.6
-                    linewidth = 2
-                    legend_fontsize = 11
-                if label == 'pfn_hard':
-                    label = 'Jet'
-                if label == 'pfn_beforeCS':
-                    label = 'Jet + Background (before subtraction)'   
-                    alpha = 0.6
-                    legend_fontsize = 11
-                    linewidth = 3             
-                if label == 'pfn_afterCS':
-                    label = rf'Jet + Background ($R_{{\rm{{max}}}}=0.25$)' 
-                if label == 'pfn_afterCS_Rmax1':
-                    label = rf'Jet + Background ($R_{{\rm{{max}}}}=1.0$)'
             elif 'Lasso' in label:
                 linewidth = 2
                 alpha = 1
@@ -210,15 +174,8 @@ class PlotFlavor(common_base.CommonBase):
                 color=self.color(label)
                 legend_fontsize = 10
                 reg_param = float(re.search('= (.*)\)', label).group(1))
-                if 'Nsub' in label:
-                    n_terms = self.N_terms_lasso['nsub_lasso'][reg_param]
-                    print(self.observable_lasso['nsub_lasso'][reg_param])
-                elif 'EFP' in label:
+                if 'EFP' in label:
                     n_terms = self.N_terms_lasso['efp_lasso'][reg_param]
-
-                if 'Nsub' in label:
-                    label = rf'$\prod_{{N,\beta}} \left( \tau_N^{{\beta}} \right) ^{{c_{{N,\beta}} }}$'
-                elif 'EFP' in label:
                     label = rf'$\sum_{{G}} c_{{G}} \rm{{EFP}}_{{G}}$'
                 label += f', {n_terms} terms'
 
@@ -247,122 +204,6 @@ class PlotFlavor(common_base.CommonBase):
         plt.close()
 
         self.roc_plot_index += 1
- 
-    #--------------------------------------------------------------- 
-    # Plot Significance improvement
-    #--------------------------------------------------------------- 
-    def plot_significance_improvement(self, roc_list, jet_pt_min):
-    
-        plt.axis([0, 1, 0, 3])
-        plt.title('JEWEL vs. PYTHIA8     ' + r'$100<p_{\mathrm{T,jet}}<125\;\mathrm{GeV}$', fontsize=14)
-        if self.plot_title:
-            plt.title(rf'$p_T min = {jet_pt_min}$', fontsize=14)
-        plt.xlabel('True AA Rate', fontsize=16)
-        plt.ylabel('Significance improvement', fontsize=16)
-        plt.grid(True)
-            
-        for label,value in roc_list.items():
-            index=0
-            if label in ['PFN', 'EFN', 'jet_mass', 'jet_angularity', 'LHA', 'thrust', 'pTD', 'hadron_z', 'zg', 'jet_theta_g'] or 'multiplicity' in label or 'PFN' in label or 'EFN' in label or 'pfn' in label:
-                linewidth = 4
-                alpha = 0.5
-                linestyle = self.linestyle(label)
-                color=self.color(label)
-                legend_fontsize = 12
-                if label == 'jet_angularity':
-                    label = r'$\lambda_1$ (girth)'
-                    linewidth = 2
-                    alpha = 0.6
-                if label == 'PFN':
-                    label = 'Particle Flow Network'
-                if label == 'EFN':
-                    label = 'Energy Flow Network'
-            elif 'Lasso' in label:
-                linewidth = 2
-                alpha = 1
-                linestyle = 'solid'
-                color=self.color(label)
-                legend_fontsize = 10
-                reg_param = float(re.search('= (.*)\)', label).group(1))
-                if 'Nsub' in label:
-                    n_terms = self.N_terms_lasso['nsub_lasso'][reg_param]
-                    print(self.observable_lasso['nsub_lasso'][reg_param])
-                elif 'EFP' in label:
-                    n_terms = self.N_terms_lasso['efp_lasso'][reg_param]
-
-                if 'Nsub' in label:
-                    label = rf'$\prod_{{N,\beta}} \left( \tau_N^{{\beta}} \right) ^{{c_{{N,\beta}} }}$'
-                elif 'EFP' in label:
-                    label = rf'$\sum_{{G}} c_{{G}} \rm{{EFP}}_{{G}}$'
-                label += f', {n_terms} terms'
-
-            elif 'DNN' in label or 'EFP' in label or 'nsub' in label:
-                linewidth = 2
-                alpha = 0.9
-                linestyle = 'solid'
-                color=self.color(label)
-                legend_fontsize = 12
-            else:
-                linewidth = 2
-                linestyle = 'solid'
-                alpha = 0.9
-                color = sns.xkcd_rgb['almost black']
-                legend_fontsize = 12
-                
-            FPR = value[0]
-            TPR = value[1]
-            plt.plot(TPR, TPR/np.sqrt(FPR+0.001), linewidth=linewidth, label=label,
-                     linestyle=linestyle, alpha=alpha, color=color)
-         
-        plt.legend(loc='best', fontsize=10)
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir_i, f'Significance_improvement_{self.significance_plot_index}.pdf'))
-        plt.close()
-
-        self.significance_plot_index += 1
-
-    #---------------------------------------------------------------
-    # Plot AUC as a function of K
-    #---------------------------------------------------------------
-    def plot_AUC_convergence(self, output_dir, auc_list, event_type, jetR, jet_pt_bin, R_max):
-    
-        plt.axis([0, self.K_list[-1], 0, 1])
-        if self.plot_title:
-            plt.title(rf'{event_type} event: $R = {jetR}, p_T = {jet_pt_bin}, R_{{max}} = {R_max}$', fontsize=14)
-        plt.xlabel('K', fontsize=16)
-        plt.ylabel('AUC', fontsize=16)
-
-        for label,value in auc_list.items():
-        
-            if 'hard' in label:
-                color = sns.xkcd_rgb['dark sky blue']
-                label_suffix = ' (no background)'
-            if 'combined' in label:
-                color = sns.xkcd_rgb['medium green']
-                label_suffix = ' (thermal background)'
-
-            if 'pfn' in label:
-                AUC_PFN = value[0]
-                label = f'PFN{label_suffix}'
-                plt.axline((0, AUC_PFN), (1, AUC_PFN), linewidth=4, label=label,
-                           linestyle='solid', alpha=0.5, color=color)
-            elif 'efn' in label:
-                AUC_EFN = value[0]
-                label = f'EFN{label_suffix}'
-                plt.axline((0, AUC_EFN), (1, AUC_EFN), linewidth=4, label=label,
-                           linestyle='solid', alpha=0.5, color=color)
-            elif 'neural_network' in label:
-                label = f'DNN{label_suffix}'
-                plt.plot(self.K_list, value, linewidth=2,
-                         linestyle='solid', alpha=0.9, color=color,
-                         label=label)
-                    
-        plt.legend(loc='lower right', fontsize=12)
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, f'AUC_convergence{self.auc_plot_index}.pdf'))
-        plt.close()
-
-        self.auc_plot_index += 1
 
     #---------------------------------------------------------------
     # Get color for a given label
@@ -372,11 +213,11 @@ class PlotFlavor(common_base.CommonBase):
         color = None
         if label in ['PFN', 'PFN_hard', 'EFP (d = 7), Linear']:
             color = sns.xkcd_rgb['faded purple'] 
-        elif label in ['EFN', 'EFN_hard']:
+        elif label in ['EFN', 'EFN_hard', 'jet_charge_k0']:
             color = sns.xkcd_rgb['faded red']    
         elif label in ['EFP (d = 6), Linear']:
             color = sns.xkcd_rgb['dark sky blue']    
-        elif label in ['pfn_afterCS_Rmax1']:
+        elif label in ['jet_charge_k0']:
             color = sns.xkcd_rgb['light lavendar']    
         elif label in ['EFN_background', 'EFP (d = 5), Linear']:
             color = sns.xkcd_rgb['medium green']  
@@ -384,11 +225,10 @@ class PlotFlavor(common_base.CommonBase):
             color = sns.xkcd_rgb['watermelon'] 
         elif label in ['EFP (d = 4), Linear', rf'Lasso $(\alpha = {self.efp_alpha_list[0]})$, EFP']:
             color = sns.xkcd_rgb['light brown'] 
-        elif label in ['jet_theta_g']:
+        elif label in ['jet_charge_k0.3']:
             color = sns.xkcd_rgb['medium brown']
         else:
             color = sns.xkcd_rgb['almost black']
-        #  'pfn_beforeCS', 'pfn_beforeCS_min_pt', 
 
         return color
 

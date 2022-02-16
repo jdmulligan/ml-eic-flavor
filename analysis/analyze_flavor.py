@@ -13,6 +13,7 @@ import subprocess
 from numba import jit, prange
 import functools
 import shutil
+from collections import defaultdict
 
 # Data analysis and plotting
 import pandas as pd
@@ -103,6 +104,7 @@ class AnalyzePPAA(common_base.CommonBase):
         self.jet_pt_min_list= config['jet_pt_min_list']
         self.min_particle_pt = config['min_particle_pt']
         self.jetR = 0.4
+        self.kappa = config['kappa']
 
         self.q_label = config['q_label']
         self.g_label = config['g_label']
@@ -244,7 +246,7 @@ class AnalyzePPAA(common_base.CommonBase):
                 self.roc_curve_dict[model] = {}
 
             # Plot the input data
-            self.plot_QA(jet_pt_min)
+            self.plot_QA()
 
             # Compute EFPs
             if 'efp_dnn' in self.models or 'efp_linear' in self.models or 'efp_lasso' in self.models:
@@ -360,13 +362,27 @@ class AnalyzePPAA(common_base.CommonBase):
 
     #---------------------------------------------------------------
     # Compute some individual jet observables
+    # TODO: speed up w/numba
     #---------------------------------------------------------------
     def compute_jet_observables(self):
 
-        self.qa_results = {}
-        self.qa_observables = []
+        self.qa_results = defaultdict(list)
+        self.qa_observables = [f'jet_charge_k{kappa}' for kappa in self.kappa]
 
-        # TODO: Compute jet charge...
+        # Compute jet charge
+        for kappa in self.kappa:
+
+            for jet in self.X_particles:
+
+                jet_charge = 0
+                jet_pt = 0
+                for particle in jet:
+                    pt = particle[0]
+                    charge = particle[5]
+                    jet_pt += pt
+                    jet_charge += charge * np.power(pt, kappa)
+                jet_charge = jet_charge / np.power(jet_pt, kappa)
+                self.qa_results[f'jet_charge_k{kappa}'].append(jet_charge)
 
     #---------------------------------------------------------------
     # Train models
@@ -401,8 +417,8 @@ class AnalyzePPAA(common_base.CommonBase):
 
         # Plot traditional observables
         for observable in self.qa_observables:
-            if 'matched' not in observable:
-                self.roc_curve_dict_lasso[observable] = sklearn.metrics.roc_curve(self.y_total[:self.n_total], -self.qa_results[observable])
+            self.roc_curve_dict_lasso[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]))
+            self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]))
 
         # Save ROC curves to file
         if 'nsub_dnn' in self.models or 'efp_dnn' in self.models or 'nsub_linear' in self.models or 'efp_linear' in self.models or 'pfn' in self.models or 'efn' in self.models:
@@ -699,19 +715,6 @@ class AnalyzePPAA(common_base.CommonBase):
         logy = 'nsub' in model
 
         self.plot_observable(designed_observable, y, xlabel=xlabel, ylabel=ylabel, filename=f'{model}_{alpha}.pdf', logy=logy)
-
-        if 'nsub' in model:
-            # Plot tau_(N-1)_1 directly
-            observable = rf'$\tau_{{{19}}}^{{{1}}}$'
-            index = 3*self.K_lasso - 6
-            tau_max_1 = np.exp(X_train[:,index])
-            self.plot_observable(tau_max_1, y, xlabel=observable, filename='tau_max_1.pdf')
-
-            # Plot 1/tau_(N-1)_1
-            observable = rf'$1/\tau_{{{19}}}^{{{1}}}$'
-            index = 3*self.K_lasso - 6
-            tau_max_1_inv = np.reciprocal(np.exp(X_train[:,index]) + 0.0001)
-            self.plot_observable(tau_max_1_inv, y, xlabel=observable, filename='tau_max_1_inv.pdf')
 
     #---------------------------------------------------------------
     # Train DNN, using hyperparameter optimization with keras tuner
@@ -1044,40 +1047,28 @@ class AnalyzePPAA(common_base.CommonBase):
     #---------------------------------------------------------------
     # Plot QA
     #---------------------------------------------------------------
-    def plot_QA(self, jet_pt_min):
+    def plot_QA(self):
     
         for qa_observable in self.qa_observables:
-            if qa_observable not in self.qa_results:
-                continue
-            qa_observable_shape = self.qa_results[qa_observable].shape
-            if qa_observable_shape[0] == 0:
-                continue
-            
-            if  self.y_total[:self.n_total].shape[0] != qa_observable_shape[0]:
-                sys.exit(f'ERROR: {qa_observable}: {qa_observable_shape}, y shape: {self.y_total[self.n_total].shape}')
+
+            result = np.array(self.qa_results[qa_observable])
+            if self.y.shape[0] != len(result):
+                sys.exit(f'ERROR: {qa_observable}: {len(result)}, y shape: {self.y.shape}')
                
-            jewel_indices = self.y_total[:self.n_total]
-            pythia_indices = 1 - self.y_total[:self.n_total]
-            result_jewel = self.qa_results[qa_observable][jewel_indices.astype(bool)]
-            result_pythia = self.qa_results[qa_observable][pythia_indices.astype(bool)]
+            q_indices = self.y
+            g_indices = 1 - self.y
+            result_q = result[q_indices.astype(bool)]
+            result_g = result[g_indices.astype(bool)]
 
             # Set some labels
-            if qa_observable == 'jet_theta_g':
-                xlabel = rf'$\theta_{{\rm{{g}} }}$'
-                ylabel = rf'$\frac{{1}}{{\sigma}} \frac{{d\sigma}}{{d\theta_{{\rm{{g}} }} }}$'
-                bins = np.linspace(0, 1., 50)
-            elif qa_observable == 'thrust':
-                xlabel = rf'$\lambda_2$'
-                ylabel = rf'$\frac{{1}}{{\sigma}} \frac{{d\sigma}}{{d\lambda_2 }} }}$'
-                bins = np.linspace(0, 0.3, 50)
-            elif qa_observable == 'zg':
-                xlabel = rf'$z_{{\rm{{g}} }}$'
-                ylabel = rf'$\frac{{1}}{{\sigma}} \frac{{d\sigma}}{{dz_{{\rm{{g}} }} }}$'
-                bins = np.linspace(0.2, 0.5, 15)
+            if 'jet_charge' in qa_observable:
+                xlabel = rf'$Q_{{\kappa}}$'
+                ylabel = rf'$\frac{{1}}{{\sigma}} \frac{{d\sigma}}{{dQ_{{\kappa}} }}$'
+                bins = np.linspace(-1, 1., 100)
             else:
                 ylabel = ''
                 xlabel = rf'{qa_observable}'
-                bins = np.linspace(0, np.amax(result_pythia), 20)
+                bins = np.linspace(0, np.amax(result_g), 20)
             plt.xlabel(xlabel, fontsize=14)
             plt.ylabel(ylabel, fontsize=16)
 
@@ -1087,13 +1078,13 @@ class AnalyzePPAA(common_base.CommonBase):
                 stat='density'
 
             # Construct dataframes for histplot
-            df_jewel = pd.DataFrame(result_jewel, columns=[xlabel])
-            df_pythia = pd.DataFrame(result_pythia, columns=[xlabel])
+            df_q = pd.DataFrame(result_q, columns=[xlabel])
+            df_g = pd.DataFrame(result_g, columns=[xlabel])
             
             # Add label columns to each df to differentiate them for plotting
-            df_jewel['generator'] = np.repeat(self.AA_label, result_jewel.shape[0])
-            df_pythia['generator'] = np.repeat(self.pp_label, result_pythia.shape[0])
-            df = df_jewel.append(df_pythia, ignore_index=True)
+            df_q['generator'] = np.repeat(self.q_label, result_q.shape[0])
+            df_g['generator'] = np.repeat(self.g_label, result_g.shape[0])
+            df = df_q.append(df_g, ignore_index=True)
 
             # Histplot
             h = sns.histplot(df, x=xlabel, hue='generator', stat=stat, bins=bins, element='step', common_norm=False)
@@ -1105,22 +1096,22 @@ class AnalyzePPAA(common_base.CommonBase):
             plt.close()
 
     #---------------------------------------------------------------
-    # Plot JEWEL vs. PYTHIA
+    # Plot q vs. g
     #---------------------------------------------------------------
     def plot_observable(self, X, y_train, xlabel='', ylabel='', filename='', xfontsize=12, yfontsize=16, logx=False, logy=False):
             
-        jewel_indices = y_train
-        pythia_indices = 1 - y_train
+        q_indices = y_train
+        g_indices = 1 - y_train
 
-        observable_jewel = X[jewel_indices.astype(bool)]
-        observable_pythia = X[pythia_indices.astype(bool)]
+        observable_q = X[q_indices.astype(bool)]
+        observable_g = X[g_indices.astype(bool)]
 
-        df_jewel = pd.DataFrame(observable_jewel, columns=[xlabel])
-        df_pythia = pd.DataFrame(observable_pythia, columns=[xlabel])
+        df_q = pd.DataFrame(observable_q, columns=[xlabel])
+        df_g = pd.DataFrame(observable_g, columns=[xlabel])
 
-        df_jewel['generator'] = np.repeat(self.AA_label, observable_jewel.shape[0])
-        df_pythia['generator'] = np.repeat(self.pp_label, observable_pythia.shape[0])
-        df = df_jewel.append(df_pythia, ignore_index=True)
+        df_q['generator'] = np.repeat(self.AA_label, observable_q.shape[0])
+        df_g['generator'] = np.repeat(self.pp_label, observable_g.shape[0])
+        df = df_q.append(df_g, ignore_index=True)
 
         if filename == 'tau_10_11_14_14.pdf':
             #bins = 10 ** np.linspace(np.log10(1.e-16), np.log10(1.e-10), 50)
@@ -1151,23 +1142,23 @@ class AnalyzePPAA(common_base.CommonBase):
             
         print(f'Plotting input EFP data {suffix}, d={d}...')
 
-        # Separate PYTHIA/JEWEL
-        jewel_indices = self.y
-        pythia_indices = 1 - self.y
-        X_jewel = X_EFP_d[jewel_indices.astype(bool)]
-        X_pythia = X_EFP_d[pythia_indices.astype(bool)]
+        # Separate q/g
+        q_indices = self.y
+        g_indices = 1 - self.y
+        X_q = X_EFP_d[q_indices.astype(bool)]
+        X_g = X_EFP_d[g_indices.astype(bool)]
 
         # Get labels
         graphs = [str(x) for x in self.graphs[:4]]
 
         # Construct dataframes for scatter matrix plotting
-        df_jewel = pd.DataFrame(X_jewel, columns=graphs)
-        df_pythia = pd.DataFrame(X_pythia, columns=graphs)
+        df_q = pd.DataFrame(X_q, columns=graphs)
+        df_g = pd.DataFrame(X_g, columns=graphs)
         
         # Add label columns to each df to differentiate them for plotting
-        df_jewel['generator'] = np.repeat(self.g_label, X_jewel.shape[0])
-        df_pythia['generator'] = np.repeat(self.q_label, X_pythia.shape[0])
-        df = df_jewel.append(df_pythia, ignore_index=True)
+        df_q['generator'] = np.repeat(self.g_label, X_q.shape[0])
+        df_g['generator'] = np.repeat(self.q_label, X_g.shape[0])
+        df = df_q.append(df_g, ignore_index=True)
 
         # Plot scatter matrix
         g = sns.pairplot(df, corner=True, hue='generator', plot_kws={'alpha':0.1})

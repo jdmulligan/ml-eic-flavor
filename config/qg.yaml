@@ -3,6 +3,7 @@
 # We will loop over two data samples with different min jet pt
 jet_pt_min_list: [5, 10]
 min_particle_pt: 0.
+kappa: [0.3, 0.5, 0.7]
 
 # Classification labels
 q_label: 'quark'
