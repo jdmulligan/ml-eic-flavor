@@ -67,14 +67,15 @@ def filter_four_vectors(X_particles, min_pt=0.):
     return X_particles
 
 ################################################################
-class AnalyzePPAA(common_base.CommonBase):
+class AnalyzeFlavor(common_base.CommonBase):
 
     #---------------------------------------------------------------
     # Constructor
     #---------------------------------------------------------------
-    def __init__(self, config_file='', output_dir='', **kwargs):
+    def __init__(self, config_file='', output_dir='', flavor_type='', **kwargs):
         super(common_base.CommonBase, self).__init__(**kwargs)
         
+        self.flavor_type = flavor_type
         self.config_file = config_file
         self.output_dir = output_dir
         if not os.path.exists(self.output_dir):
@@ -83,7 +84,12 @@ class AnalyzePPAA(common_base.CommonBase):
         # Initialize config file
         self.initialize_config()
             
-        self.filename_base = 'training_data/jets_pT{}.txt'
+        if flavor_type == 'qg':
+            self.input_filename = 'training_data/photoprod_jets.txt'
+        elif flavor_type == 'uds':
+            self.input_filename = 'training_data/LOjets.txt'
+        else:
+            sys.exit(f'Unknown flavor type: {flavor_type}')
 
         # Remove keras-tuner folder, if it exists
         if os.path.exists('keras_tuner'):
@@ -176,7 +182,7 @@ class AnalyzePPAA(common_base.CommonBase):
     #---------------------------------------------------------------
     # Main processing function
     #---------------------------------------------------------------
-    def analyze_pp_aa(self):
+    def analyze_flavor(self):
 
         # Loop through combinations of event type, jetR, and R_max
         self.AUC = {}
@@ -198,21 +204,20 @@ class AnalyzePPAA(common_base.CommonBase):
             # Read input file into dataframe -- the files store the particle info as: (pt, eta, phi, pid)
             # Then transform these into a 3D numpy array (jets, particles, particle info)
             # The format of the particle info in X_particles will be: (pt, eta, phi, m, pid, charge)
-            jet_df = pd.read_csv(self.filename_base.format(jet_pt_min), delimiter="\s+")                                                                                                                                                                                                               
-            X_particles_total = self.create_jet_array(jet_df)                                                                                                                            
-            self.y_total = jet_df[jet_df.ct==1]['qg'].to_numpy()
+            jet_df = pd.read_csv(self.input_filename, sep='\s+')
+            X_particles_total, self.y_total = self.create_jet_array(jet_df, jet_pt_min)
 
             # Determine total number of jets
             total_jets = int(self.y_total.size)
-            total_jets_q = int(np.sum(self.y_total))
-            total_jets_g = total_jets - total_jets_q
+            total_jets_g = int(np.sum(self.y_total))
+            total_jets_q = total_jets - total_jets_g
             print(f'Total number of jets available: {total_jets_q} (q), {total_jets_g} (g)')
 
             # If there is an imbalance, remove excess jets
             if total_jets_q > total_jets_g:
-                indices_to_remove = np.where( np.isclose(self.y_total,1) )[0][total_jets_g:]
+                indices_to_remove = np.where( np.isclose(self.y_total,0) )[0][total_jets_g:]
             elif total_jets_q < total_jets_g:
-                indices_to_remove = np.where( np.isclose(self.y_total,0) )[0][total_jets_q:]
+                indices_to_remove = np.where( np.isclose(self.y_total,1) )[0][total_jets_q:]
             y_balanced = np.delete(self.y_total, indices_to_remove)
             X_particles_balanced = np.delete(X_particles_total, indices_to_remove, axis=0)
             total_jets = int(y_balanced.size)
@@ -333,7 +338,7 @@ class AnalyzePPAA(common_base.CommonBase):
     # Parse the input file into a 3D array (jets, particles, particle info)
     # The particle info will be stored as: (pt, eta, phi, m, pid, charge)
     #---------------------------------------------------------------
-    def create_jet_array(self, jet_df):
+    def create_jet_array(self, jet_df, jet_pt_min):
 
         # Add columns of mass and charge
         # Note that some PIDs are not recognized by the energyflow functions (311 -- K0)
@@ -348,17 +353,48 @@ class AnalyzePPAA(common_base.CommonBase):
         columns[index_pid], columns[index_mass] = columns[index_mass], columns[index_pid]
         jet_df = jet_df[columns]
 
-        # Kyle's IO: Get nested list of particle info for each jet, then convert to numpy array
-        # TODO: This could be made more efficient by translating directly into numpy array rather than list
-        g = jet_df.drop(columns=['qg','ct']).groupby('num').cumcount()                                                                                     
-        L = (jet_df.drop(columns=['qg','ct']).set_index(['num',g])                                                                                         
-            .unstack(fill_value=0)                                                                                                                       
-            .stack().groupby(level=0)                                                                                                                    
-                .apply(lambda x: x.values.tolist())                                                                                                         
-                .tolist())    
-        jet_array = np.array(L)
+        # Filter by jet pt
+        jet_df = jet_df[jet_df['jetpT']>jet_pt_min]
 
-        return jet_array
+        # Get flavor label from first particle of each jet
+        #   For flavor_type = qg:
+        #     1 = q     -->      0 = q
+        #     2 = g     -->      1 = g
+        #   For flavor_type = uds:
+        #     1 = d
+        #     2 = u
+        #     3 = s
+        #     4 = c
+        labels = jet_df[jet_df.ct==1]['qg'].to_numpy()
+        if self.flavor_type == 'qg':
+            labels -= 1
+        elif self.flavor_type == 'uds':
+            sys.exit('Multi-label classification not yet implemented.')
+
+        # Translate dataframe into 3D numpy array: (jets, particles, particle info)
+        #                          where particle info is: (pt, eta, phi, m, pid, charge)
+        # Based on: https://stackoverflow.com/questions/52621497/pandas-group-by-column-and-transform-the-data-to-numpy-array
+
+        # First, drop unnecessary columns
+        # TODO: For now, we neglect which event the jets come from
+        # TODO: For now, we don't select on the process
+        #   For flavor_type = qg: https://eic.github.io/software/pythia6.html
+        #   For flavor_type = uds: always 99 for the LO DIS process
+        jet_df = jet_df.drop(columns=['proc', 'event', 'qg', 'ct', 'jetpT'])
+
+        # Generate particle indices for each jet
+        jet_df_grouped = jet_df.groupby(['jet'])
+        particle_indices = jet_df_grouped.cumcount()
+
+        # Zero pad                                                                                
+        jet_df_zero_padded = jet_df.set_index(['jet', particle_indices]).unstack(fill_value=0).stack()
+
+        # Group and convert to array
+        jet_list = jet_df_zero_padded.groupby(level=0).apply(lambda x: x.values.tolist()).tolist()                                                                                                               
+        jet_array = np.array(jet_list)
+        print(f'(n_jets, n_particles, n_particle_info) = {jet_array.shape}')
+
+        return jet_array, labels
 
     #---------------------------------------------------------------
     # Compute some individual jet observables
@@ -1187,18 +1223,23 @@ if __name__ == '__main__':
                         type=str, metavar='outputDir',
                         default='./TestOutput',
                         help='Output directory for output to be written to')
+    parser.add_argument('-f', '--flavorType', action='store',
+                        type=str, metavar='flavorType',
+                        default='qg',
+                        help='Type of flavor discrimination: qg or uds')
 
     # Parse the arguments
     args = parser.parse_args()
 
     print('Configuring...')
     print('configFile: \'{0}\''.format(args.configFile))
-    print('ouputDir: \'{0}\"'.format(args.outputDir))
+    print('ouputDir: \'{0}\''.format(args.outputDir))
+    print('flavorType: \'{0}\''.format(args.flavorType))
 
     # If invalid configFile is given, exit
     if not os.path.exists(args.configFile):
         print('File \"{0}\" does not exist! Exiting!'.format(args.configFile))
         sys.exit(0)
 
-    analysis = AnalyzePPAA(config_file=args.configFile, output_dir=args.outputDir)
-    analysis.analyze_pp_aa()
+    analysis = AnalyzeFlavor(config_file=args.configFile, output_dir=args.outputDir, flavor_type=args.flavorType)
+    analysis.analyze_flavor()

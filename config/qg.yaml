@@ -1,7 +1,6 @@
 # Config file for q vs g jet classification
 
-# We will loop over two data samples with different min jet pt
-jet_pt_min_list: [5, 10]
+jet_pt_min_list: [10]    # Can loop over different min jet pt 
 min_particle_pt: 0.
 kappa: [0.3, 0.5, 0.7]
 
