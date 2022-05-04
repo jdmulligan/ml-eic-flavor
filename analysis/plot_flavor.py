@@ -58,6 +58,9 @@ class PlotFlavor(common_base.CommonBase):
         self.jet_pt_min_list = config['jet_pt_min_list']
         self.kappa = config['kappa']
 
+        self.q_label = config['q_label']
+        self.g_label = config['g_label']
+
         self.models = config['models']
         self.dmax = config['dmax']
         self.efp_measure = config['efp_measure']
@@ -141,11 +144,11 @@ class PlotFlavor(common_base.CommonBase):
     
         plt.plot([0, 1], [0, 1], 'k--') # dashed diagonal
         plt.axis([0, 1, 0, 1])
-        plt.title('q vs. g     ' + rf'$p_{{\mathrm{{T,jet}}}}>{jet_pt_min}\;\mathrm{{GeV}}$', fontsize=14)
+        plt.title(f'{self.q_label} vs. {self.g_label}     ' + rf'$p_{{\mathrm{{T,jet}}}}>{jet_pt_min}\;\mathrm{{GeV}}$', fontsize=14)
         if self.plot_title:
             plt.title(rf'$p_T min = {jet_pt_min}$', fontsize=14)
-        plt.xlabel('False q Rate', fontsize=16)
-        plt.ylabel('True q Rate', fontsize=16)
+        plt.xlabel(f'False {self.q_label} Rate', fontsize=16)
+        plt.ylabel(f'True {self.q_label} Rate', fontsize=16)
         plt.grid(True)
     
         for label,value in roc_list.items():

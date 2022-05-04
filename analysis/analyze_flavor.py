@@ -211,7 +211,7 @@ class AnalyzeFlavor(common_base.CommonBase):
             total_jets = int(self.y_total.size)
             total_jets_g = int(np.sum(self.y_total))
             total_jets_q = total_jets - total_jets_g
-            print(f'Total number of jets available: {total_jets_q} (q), {total_jets_g} (g)')
+            print(f'Total number of jets available: {total_jets_q} ({self.q_label}), {total_jets_g} ({self.g_label})')
 
             # If there is an imbalance, remove excess jets
             if total_jets_q > total_jets_g:
@@ -223,7 +223,7 @@ class AnalyzeFlavor(common_base.CommonBase):
             total_jets = int(y_balanced.size)
             total_jets_q = int(np.sum(y_balanced))
             total_jets_g = total_jets - total_jets_q
-            print(f'Total number of jets available after balancing: {total_jets_q} (q), {total_jets_g} (g)')
+            print(f'Total number of jets available after balancing: {total_jets_q} ({self.q_label}), {total_jets_g} ({self.g_label})')
 
             # Shuffle dataset 
             idx = np.random.permutation(len(y_balanced))
@@ -365,11 +365,20 @@ class AnalyzeFlavor(common_base.CommonBase):
         #     2 = u
         #     3 = s
         #     4 = c
-        labels = jet_df[jet_df.ct==1]['qg'].to_numpy()
         if self.flavor_type == 'qg':
+            labels = jet_df[jet_df.ct==1]['qg'].to_numpy()
             labels -= 1
         elif self.flavor_type == 'uds':
-            sys.exit('Multi-label classification not yet implemented.')
+            # TODO: implement multiple category classification
+            # For now we just do u vs. d
+            mask = (jet_df['qg']==1) | (jet_df['qg']==2)
+            jet_df = jet_df[mask]
+            labels = jet_df[jet_df.ct==1]['qg'].to_numpy()
+            labels = np.abs(labels)
+            print(labels)
+            labels = np.where(labels == 1, 0, labels)
+            labels = np.where(labels == 2, 1, labels)
+            print(labels)
 
         # Translate dataframe into 3D numpy array: (jets, particles, particle info)
         #                          where particle info is: (pt, eta, phi, m, pid, charge)
