@@ -18,6 +18,7 @@ from collections import defaultdict
 # Data analysis and plotting
 import pandas as pd
 import numpy as np
+from particle import Particle
 from matplotlib import pyplot as plt
 import seaborn as sns
 sns.set_context('paper', rc={'font.size':18,'axes.titlesize':18,'axes.labelsize':18})
@@ -375,10 +376,18 @@ class AnalyzeFlavor(common_base.CommonBase):
             jet_df = jet_df[mask]
             labels = jet_df[jet_df.ct==1]['qg'].to_numpy()
             labels = np.abs(labels)
-            print(labels)
+            print(f'initial labels: {labels}')
             labels = np.where(labels == 1, 0, labels)
             labels = np.where(labels == 2, 1, labels)
-            print(labels)
+            print(f'adjusted labels: {labels}')
+            print()
+
+        # Check pdg values that are present
+        pdg_values = np.unique(np.absolute(jet_df['pid'].values))
+        print('pdg values in the particle list:')
+        for pdg_value in pdg_values:
+            print(f'  {pdg_value}: {Particle.from_pdgid(pdg_value)}')
+        print()
 
         # Translate dataframe into 3D numpy array: (jets, particles, particle info)
         #                          where particle info is: (pt, eta, phi, m, pid, charge)
