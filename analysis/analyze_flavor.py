@@ -76,7 +76,6 @@ class AnalyzeFlavor(common_base.CommonBase):
     def __init__(self, config_file='', output_dir='', flavor_type='', **kwargs):
         super(common_base.CommonBase, self).__init__(**kwargs)
         
-        self.flavor_type = flavor_type
         self.config_file = config_file
         self.output_dir = output_dir
         if not os.path.exists(self.output_dir):
@@ -85,9 +84,9 @@ class AnalyzeFlavor(common_base.CommonBase):
         # Initialize config file
         self.initialize_config()
             
-        if flavor_type == 'qg':
-            self.input_filename = 'training_data/photoprod_jets.txt'
-        elif flavor_type == 'uds':
+        if self.flavor_type == 'qg':
+            self.input_filename = 'training_data/photojets.txt'
+        elif self.flavor_type == 'uds':
             self.input_filename = 'training_data/LOjets.txt'
         else:
             sys.exit(f'Unknown flavor type: {flavor_type}')
@@ -107,6 +106,8 @@ class AnalyzeFlavor(common_base.CommonBase):
         # Read config file
         with open(self.config_file, 'r') as stream:
           config = yaml.safe_load(stream)
+
+        self.flavor_type = config['flavor_type']
           
         self.jet_pt_min_list= config['jet_pt_min_list']
         self.min_particle_pt = config['min_particle_pt']
@@ -383,11 +384,25 @@ class AnalyzeFlavor(common_base.CommonBase):
             print()
 
         # Check pdg values that are present
-        pdg_values = np.unique(np.absolute(jet_df['pid'].values))
+        pdg_values_present = np.unique(np.absolute(jet_df['pid'].values))
         print('pdg values in the particle list:')
-        for pdg_value in pdg_values:
+        for pdg_value in pdg_values_present:
             print(f'  {pdg_value}: {Particle.from_pdgid(pdg_value)}')
-        print()
+
+        # Particles expected for c*tau > 1cm: (gamma, e-, mu-, pi+, K+, K_L0, p+, n, Sigma+, Sigma-, Xi-, Xi0, Omega-, Lambda0)
+        reference_particles_pdg = [22, 11, 13, 211, 130, 321, 2212, 2112, 3222, 3112, 3312, 3322, 3334, 3122]
+
+        for pdg_value in reference_particles_pdg:
+            if pdg_value not in pdg_values_present:
+                print(f'WARNING: Missing particles: {Particle.from_pdgid(pdg_value)} not found in your accepted particles!')
+        
+        exit = False
+        for pdg_value in pdg_values_present:
+            if pdg_value not in reference_particles_pdg:
+                print(f'WARNING: Extra particles: {Particle.from_pdgid(pdg_value)} was found in your accepted particles!')
+                exit = True
+        if exit:
+            sys.exit()
 
         # Translate dataframe into 3D numpy array: (jets, particles, particle info)
         #                          where particle info is: (pt, eta, phi, m, pid, charge)
@@ -1241,10 +1256,6 @@ if __name__ == '__main__':
                         type=str, metavar='outputDir',
                         default='./TestOutput',
                         help='Output directory for output to be written to')
-    parser.add_argument('-f', '--flavorType', action='store',
-                        type=str, metavar='flavorType',
-                        default='qg',
-                        help='Type of flavor discrimination: qg or uds')
 
     # Parse the arguments
     args = parser.parse_args()
@@ -1252,12 +1263,11 @@ if __name__ == '__main__':
     print('Configuring...')
     print('configFile: \'{0}\''.format(args.configFile))
     print('ouputDir: \'{0}\''.format(args.outputDir))
-    print('flavorType: \'{0}\''.format(args.flavorType))
 
     # If invalid configFile is given, exit
     if not os.path.exists(args.configFile):
         print('File \"{0}\" does not exist! Exiting!'.format(args.configFile))
         sys.exit(0)
 
-    analysis = AnalyzeFlavor(config_file=args.configFile, output_dir=args.outputDir, flavor_type=args.flavorType)
+    analysis = AnalyzeFlavor(config_file=args.configFile, output_dir=args.outputDir)
     analysis.analyze_flavor()

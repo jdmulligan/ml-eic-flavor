@@ -1,4 +1,5 @@
 # Config file for u/d/s/c jet classification
+flavor_type: 'uds' # DIS
 
 jet_pt_min_list: [10]    # Can loop over different min jet pt 
 min_particle_pt: 0.
