@@ -87,7 +87,7 @@ class AnalyzeFlavor(common_base.CommonBase):
         if self.flavor_type == 'qg':
             self.input_filename = 'training_data/photojets.txt'
         elif self.flavor_type == 'uds':
-            self.input_filename = 'training_data/LOjets.txt'
+            self.input_filename = '/rstorage/ml-eic-flavor/LODIS_flavorjets_3.txt'
         else:
             sys.exit(f'Unknown flavor type: {flavor_type}')
 
@@ -341,6 +341,9 @@ class AnalyzeFlavor(common_base.CommonBase):
     # The particle info will be stored as: (pt, eta, phi, m, pid, charge)
     #---------------------------------------------------------------
     def create_jet_array(self, jet_df, jet_pt_min):
+
+        # First, remove the particles outside the jets
+        jet_df = jet_df[jet_df.jet > 0]
 
         # Add columns of mass and charge
         # Note that some PIDs are not recognized by the energyflow functions (311 -- K0)
