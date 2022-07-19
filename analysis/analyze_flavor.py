@@ -392,8 +392,8 @@ class AnalyzeFlavor(common_base.CommonBase):
         for pdg_value in pdg_values_present:
             print(f'  {pdg_value}: {Particle.from_pdgid(pdg_value)}')
 
-        # Particles expected for c*tau > 1cm: (gamma, e-, mu-, pi+, K+, K_L0, p+, n, Sigma+, Sigma-, Xi-, Xi0, Omega-, Lambda0)
-        reference_particles_pdg = [22, 11, 13, 211, 130, 321, 2212, 2112, 3222, 3112, 3312, 3322, 3334, 3122]
+        # Particles expected for c*tau > 1cm: (gamma, e-, mu-, pi+, K+, K_L0, K_S0, p+, n, Sigma+, Sigma-, Xi-, Xi0, Omega-, Lambda0)
+        reference_particles_pdg = [22, 11, 13, 211, 130, 321, 310, 2212, 2112, 3222, 3112, 3312, 3322, 3334, 3122]
 
         for pdg_value in reference_particles_pdg:
             if pdg_value not in pdg_values_present:
@@ -403,7 +403,8 @@ class AnalyzeFlavor(common_base.CommonBase):
         for pdg_value in pdg_values_present:
             if pdg_value not in reference_particles_pdg:
                 print(f'WARNING: Extra particles: {Particle.from_pdgid(pdg_value)} was found in your accepted particles!')
-                exit = True
+                if pdg_value not in [12,14,16]: # Don't crash on neutrinos, for now
+                    exit = True
         if exit:
             sys.exit()
 
