@@ -108,6 +108,13 @@ class PlotFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     def plot_models(self, jet_pt_min):
 
+        if 'pfn' in self.models:
+            roc_list = {}
+            roc_list['PFN'] = self.roc_curve_dict['pfn']
+            for kappa in self.kappa:
+                roc_list[f'jet_charge_k{kappa}'] = self.roc_curve_dict[f'jet_charge_k{kappa}']
+            self.plot_roc_curves(roc_list, jet_pt_min)
+
         if 'pfn' in self.models and 'efn' in self.models:
             roc_list = {}
             roc_list['PFN'] = self.roc_curve_dict['pfn']

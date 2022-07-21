@@ -116,6 +116,7 @@ class AnalyzeFlavor(common_base.CommonBase):
         self.n_val = config['n_val']
         self.n_test = config['n_test']
         self.n_total = self.n_train + self.n_val + self.n_test
+        self.train_frac = self.n_train / self.n_total
         self.test_frac = 1. * self.n_test / self.n_total
         self.val_frac = 1. * self.n_val / (self.n_train + self.n_val)
         
@@ -220,6 +221,13 @@ class AnalyzeFlavor(common_base.CommonBase):
             total_jets_q = int(np.sum(y_balanced))
             total_jets_g = total_jets - total_jets_q
             print(f'Total number of jets available after balancing: {total_jets_q} ({self.q_label}), {total_jets_g} ({self.g_label})')
+
+            # Reset the training,test,validation sizes based on the balanced number of jets
+            self.n_total = total_jets
+            self.n_train = int(self.n_total * self.train_frac)
+            self.n_test = int(self.n_total * self.test_frac)
+            self.n_val = self.n_total - self.n_train - self.n_test # int((self.n_total - self.n_test) * self.val_frac)
+            print(f'n_train: {self.n_train}, n_test: {self.n_test}, n_val: {self.n_val}')
 
             # Shuffle dataset 
             idx = np.random.permutation(len(y_balanced))
@@ -436,8 +444,6 @@ class AnalyzeFlavor(common_base.CommonBase):
         for pdg_value in pdg_values_present:
             if pdg_value not in reference_particles_pdg:
                 print(f'WARNING: Extra particles: {Particle.from_pdgid(pdg_value)} was found in your accepted particles!')
-                if pdg_value not in [12,14,16]: # Don't crash on neutrinos, for now
-                    exit = True
         if exit:
             sys.exit()
 
@@ -523,8 +529,8 @@ class AnalyzeFlavor(common_base.CommonBase):
 
         # Plot traditional observables
         for observable in self.qa_observables:
-            self.roc_curve_dict_lasso[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]))
-            self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]))
+            self.roc_curve_dict_lasso[observable] = sklearn.metrics.roc_curve(self.y, np.array(self.qa_results[observable]))
+            self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, np.array(self.qa_results[observable]))
 
         # Save ROC curves to file
         if 'nsub_dnn' in self.models or 'efp_dnn' in self.models or 'nsub_linear' in self.models or 'efp_linear' in self.models or 'pfn' in self.models or 'efn' in self.models:
@@ -921,10 +927,10 @@ class AnalyzeFlavor(common_base.CommonBase):
             x_PFN[mask,0] /= x_PFN[:,0].sum()
         
         # Handle particle id channel
-        #if model_settings['use_pids']:
-        #    self.my_remap_pids(X_PFN)
-        #else:
-        X_PFN = X_PFN[:,:,:3]
+        if model_settings['use_pids']:
+            self.my_remap_pids(X_PFN)
+        else:
+            X_PFN = X_PFN[:,:,:3]
         
         # Check shape
         if y.shape[0] != X_PFN.shape[0]:
@@ -1170,7 +1176,7 @@ class AnalyzeFlavor(common_base.CommonBase):
             if 'jet_charge' in qa_observable:
                 xlabel = rf'$Q_{{\kappa}}$'
                 ylabel = rf'$\frac{{1}}{{\sigma}} \frac{{d\sigma}}{{dQ_{{\kappa}} }}$'
-                bins = np.linspace(-1, 1., 100)
+                bins = np.linspace(-2, 2., 100)
             else:
                 ylabel = ''
                 xlabel = rf'{qa_observable}'
@@ -1219,15 +1225,8 @@ class AnalyzeFlavor(common_base.CommonBase):
         df_g['generator'] = np.repeat(self.pp_label, observable_g.shape[0])
         df = df_q.append(df_g, ignore_index=True)
 
-        if filename == 'tau_10_11_14_14.pdf':
-            #bins = 10 ** np.linspace(np.log10(1.e-16), np.log10(1.e-10), 50)
-            bins = np.linspace(0., 1.e-11, 100)
-            #bins = np.linspace(np.amin(X), np.amax(X), 50)
-            print(df.describe())
-            stat='count'
-        else:
-            bins = np.linspace(np.amin(X), np.amax(X), 50)
-            stat='density'
+        bins = np.linspace(np.amin(X), np.amax(X), 50)
+        stat='density'
         h = sns.histplot(df, x=xlabel, hue='generator', stat=stat, bins=bins, element='step', common_norm=False, log_scale=[False, logy])
         if h.legend_:
             #h.legend_.set_bbox_to_anchor((0.85, 0.85))
