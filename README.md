@@ -1,9 +1,12 @@
 # Running the code
 
 ## Setup software environment – on hiccup cluster
-
+<details>
+  <summary>Click for details</summary>
+<br/> 
+  
 ### Logon and allocate a node
-
+  
 Logon to hiccup:
 ```
 ssh <user>@hic.lbl.gov
@@ -16,7 +19,7 @@ First, request an interactive node from the slurm batch system:
    which requests 1 full node (20 cores) for 2 hours in the `quick` queue. You can choose the time and queue: you can use the `quick` partition for up to a 2 hour session, `std` for a 24 hour session, or `long` for a 72 hour session – but you will wait longer for the longer queues). 
 Depending how busy the squeue is, you may get the node instantly, or you may have to wait awhile.
 When you’re done with your session, just type `exit`.
-Please do not run anything bust the lightest tests on the login node. If you are finding that you have to wait a long time, let us know and we can take a node out of the slurm queue and logon to it directly.
+Please do not run anything but the lightest tests on the login node. If you are finding that you have to wait a long time, let us know and we can take a node out of the slurm queue and logon to it directly.
 
 ### Initialize environment
   
@@ -27,6 +30,7 @@ The first time you set up, you can do:
 cd ml-eic-flavor
 ./init.sh --install
 ```
+If you encounter an error that refers to python 3.6, make sure you do not have any modules or environments loaded (e.g. in your .bashrc). If you get an error related to pipenv, you can also try `pip install --user pipenv`.
   
 On subsequent times, you don't need to pass the `install` flag:
 ```
@@ -35,6 +39,45 @@ cd ml-eic-flavor
 ```
 
 Now we are ready to run our scripts.
+
+   
+</details>
+
+## Setup software environment – on perlmutter
+<details>
+  <summary>Click for details</summary>
+<br/> 
+  
+### Logon and allocate a node
+  
+Logon to perlmutter:
+```
+ssh <user>@perlmutter-p1.nersc.gov
+```
+
+First, request an [interactive node](https://docs.nersc.gov/jobs/interactive/) from the slurm batch system:
+   ```
+   salloc --nodes 1 --qos interactive --time 04:00:00 --constraint gpu --gpus 4 --account=alice_g
+   ``` 
+   which requests 4 GPUs on a node in the alice allocation (perlmutter usage is not charged, so use as much as you want). 
+When you’re done with your session, just type `exit`.
+
+### Initialize environment
+  
+We will only run the ML part of the pipeline on perlmutter. For now, you should copy your output file of generated jets/events:
+```
+scp -r /rstorage/ml-eic-flavor/<output_file> <user>@perlmutter-p1.nersc.gov:/pscratch/sd/j/<user>/
+```
+
+Now we need to initialize the environment:
+```
+cd ml-eic-flavor
+source init_perlmutter.sh
+```
+
+Now we are ready to run our scripts.
+
+</details>
 
 ## q-g jets from Kyle
 
