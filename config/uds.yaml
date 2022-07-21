@@ -9,13 +9,19 @@ kappa: [0.3, 0.5, 0.7]
 q_label: 'u'
 g_label: 'd'
 
+# Input files of training data
+input_files:
+ - '/rstorage/ml-eic-flavor/uds/LODIS_flavorjets_1.txt'
+ - '/rstorage/ml-eic-flavor/uds/LODIS_flavorjets_2.txt'
+ - '/rstorage/ml-eic-flavor/uds/LODIS_flavorjets_3.txt'
+
 # Load labeled data
-n_train: 10000
-n_val: 2000
-n_test: 2000
+n_train: 1000000
+n_val: 200000
+n_test: 200000
 
 # Select model: pfn, efn, efp_linear, efp_lasso, efp_dnn
-models: [pfn, efn, efp_linear]
+models: [pfn, efn]
 
 # efp parameters
 dmax: 5                                             # maximal degree of the EFPs

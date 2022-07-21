@@ -9,10 +9,14 @@ kappa: [0.3, 0.5, 0.7]
 q_label: 'quark'
 g_label: 'gluon'
 
+# Input files of training data
+input_files:
+ - 'training_data/photojets.txt'
+
 # Load labeled data
-n_train: 15000
-n_val: 3000
-n_test: 3000
+n_train: 1000000
+n_val: 200000
+n_test: 200000
 
 # Select model: pfn, efn, efp_linear, efp_lasso, efp_dnn
 models: [pfn, efn, efp_linear, efp_dnn]

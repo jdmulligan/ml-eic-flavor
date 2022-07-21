@@ -83,13 +83,6 @@ class AnalyzeFlavor(common_base.CommonBase):
         
         # Initialize config file
         self.initialize_config()
-            
-        if self.flavor_type == 'qg':
-            self.input_filename = 'training_data/photojets.txt'
-        elif self.flavor_type == 'uds':
-            self.input_filename = '/rstorage/ml-eic-flavor/LODIS_flavorjets_3.txt'
-        else:
-            sys.exit(f'Unknown flavor type: {flavor_type}')
 
         # Remove keras-tuner folder, if it exists
         if os.path.exists('keras_tuner'):
@@ -116,6 +109,8 @@ class AnalyzeFlavor(common_base.CommonBase):
 
         self.q_label = config['q_label']
         self.g_label = config['g_label']
+
+        self.input_files = config['input_files']
 
         self.n_train = config['n_train']
         self.n_val = config['n_val']
@@ -206,8 +201,7 @@ class AnalyzeFlavor(common_base.CommonBase):
             # Read input file into dataframe -- the files store the particle info as: (pt, eta, phi, pid)
             # Then transform these into a 3D numpy array (jets, particles, particle info)
             # The format of the particle info in X_particles will be: (pt, eta, phi, m, pid, charge)
-            jet_df = pd.read_csv(self.input_filename, sep='\s+')
-            X_particles_total, self.y_total = self.create_jet_array(jet_df, jet_pt_min)
+            X_particles_total, self.y_total = self.load_training_data(jet_pt_min)
 
             # Determine total number of jets
             total_jets = int(self.y_total.size)
@@ -335,6 +329,45 @@ class AnalyzeFlavor(common_base.CommonBase):
         print('Run plotting script...')
         cmd = f'python analysis/plot_flavor.py -c {self.config_file} -o {self.output_dir}'
         subprocess.run(cmd, check=True, shell=True)
+
+    #---------------------------------------------------------------
+    # Load training data from set of input files into numpy arrays
+    #---------------------------------------------------------------
+    def load_training_data(self, jet_pt_min):
+
+        for i,input_file in enumerate(self.input_files):
+
+            jet_df = pd.read_csv(input_file, sep='\s+')
+            X_particles, y = self.create_jet_array(jet_df, jet_pt_min)
+            print(f'X_particles shape: {X_particles.shape}')
+            print(f'y shape: {y.shape}')
+
+            if i == 0:
+                X_particles_total = X_particles
+                y_total = y
+            else:
+
+                # Zero pad according to the largest n_particles dimension
+                n_particles_total = X_particles_total.shape[1]
+                n_particles = X_particles.shape[1]
+                if n_particles_total < n_particles:
+                    X_particles_total = np.pad(X_particles_total, [(0,0), (0,n_particles-n_particles_total), (0,0)], mode='constant', constant_values=0)
+                elif n_particles_total > n_particles:
+                    X_particles = np.pad(X_particles, [(0,0), (0,n_particles_total-n_particles), (0,0)], mode='constant', constant_values=0)
+
+                X_particles_total = np.concatenate([X_particles_total, X_particles])
+                y_total = np.concatenate([y_total, y])
+
+            print()
+            print(f'X_particles_total shape: {X_particles_total.shape}')
+            print(f'y_total shape: {y_total.shape}')
+            print()
+
+            # If enough jets have been found, then return
+            if y_total.shape[0] > self.n_total:
+                break
+
+        return X_particles_total, y_total
 
     #---------------------------------------------------------------
     # Parse the input file into a 3D array (jets, particles, particle info)
