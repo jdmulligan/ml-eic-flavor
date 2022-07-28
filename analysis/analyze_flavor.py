@@ -148,6 +148,7 @@ class AnalyzeFlavor(common_base.CommonBase):
         self.train_frac = self.n_train / self.n_total
         self.test_frac = 1. * self.n_test / self.n_total
         self.val_frac = 1. * self.n_val / (self.n_train + self.n_val)
+        self.balance_samples = config['balance_samples']
         
         self.dmax = config['dmax']
         self.efp_measure = config['efp_measure']
@@ -240,16 +241,20 @@ class AnalyzeFlavor(common_base.CommonBase):
             print(f'Total number of jets available: {total_jets_class1} ({self.class1_label}), {total_jets_class2} ({self.class2_label})')
 
             # If there is an imbalance, remove excess jets
-            if total_jets_class1 > total_jets_class2:
-                indices_to_remove = np.where( np.isclose(self.y_total,0) )[0][total_jets_class2:]
-            elif total_jets_class1 < total_jets_class2:
-                indices_to_remove = np.where( np.isclose(self.y_total,1) )[0][total_jets_class1:]
-            y_balanced = np.delete(self.y_total, indices_to_remove)
-            X_particles_balanced = np.delete(X_particles_total, indices_to_remove, axis=0)
-            total_jets = int(y_balanced.size)
-            total_jets_class1 = int(np.sum(y_balanced))
-            total_jets_class2 = total_jets - total_jets_class1
-            print(f'Total number of jets available after balancing: {total_jets_class1} ({self.class1_label}), {total_jets_class2} ({self.class2_label})')
+            if self.balance_samples:
+                if total_jets_class1 > total_jets_class2:
+                    indices_to_remove = np.where( np.isclose(self.y_total,0) )[0][total_jets_class2:]
+                elif total_jets_class1 < total_jets_class2:
+                    indices_to_remove = np.where( np.isclose(self.y_total,1) )[0][total_jets_class1:]
+                y_balanced = np.delete(self.y_total, indices_to_remove)
+                X_particles_balanced = np.delete(X_particles_total, indices_to_remove, axis=0)
+                total_jets = int(y_balanced.size)
+                total_jets_class1 = int(np.sum(y_balanced))
+                total_jets_class2 = total_jets - total_jets_class1
+                print(f'Total number of jets available after balancing: {total_jets_class1} ({self.class1_label}), {total_jets_class2} ({self.class2_label})')
+            else:
+                y_balanced = self.y_total
+                X_particles_balanced = X_particles_total
 
             # Reset the training,test,validation sizes based on the balanced number of jets
             self.n_total = total_jets

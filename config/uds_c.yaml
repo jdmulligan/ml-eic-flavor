@@ -20,6 +20,7 @@ input_files:
 n_train: 1000000
 n_val: 200000
 n_test: 200000
+balance_samples: True
 
 # Select model: pfn, efn, efp_linear, efp_lasso, efp_dnn
 models: [pfn]
