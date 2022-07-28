@@ -483,13 +483,15 @@ class AnalyzeFlavor(common_base.CommonBase):
         #---
 
         # Check pdg values that are present
-        pdg_values_present = np.unique(np.absolute(jet_df['pid'].values))
+        pdg_values_present = np.unique(jet_df['pid'].values)
         print('pdg values in the particle list:')
         for pdg_value in pdg_values_present:
             print(f'  {pdg_value}: {Particle.from_pdgid(pdg_value)}')
 
         # Particles expected for c*tau > 1cm: (gamma, e-, mu-, pi+, K+, K_L0, K_S0, p+, n, Sigma+, Sigma-, Xi-, Xi0, Omega-, Lambda0)
-        reference_particles_pdg = [22, 11, 13, 211, 130, 321, 310, 2212, 2112, 3222, 3112, 3312, 3322, 3334, 3122]
+        #     and antiparticles for (e-, mu-, pi+, K+, p+, n, Sigma+, Sigma-, Xi-, Xi0, Omega-, Lambda0)
+        reference_particles_pdg = [22, 11, 13, 211, 130, 321, 310, 2212, 2112, 3222, 3112, 3312, 3322, 3334, 3122] 
+        #                             -11, -13, -211, -130, -2212, -2112, -3222, -3112, -3312, -3322, -3334, -3122]
 
         for pdg_value in reference_particles_pdg:
             if pdg_value not in pdg_values_present:
@@ -584,8 +586,8 @@ class AnalyzeFlavor(common_base.CommonBase):
 
         # Plot traditional observables
         for observable in self.qa_observables:
-            self.roc_curve_dict_lasso[observable] = sklearn.metrics.roc_curve(self.y, np.array(self.qa_results[observable]))
-            self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, np.array(self.qa_results[observable]))
+            self.roc_curve_dict_lasso[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]))
+            self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]))
 
         # Save ROC curves to file
         if 'nsub_dnn' in self.models or 'efp_dnn' in self.models or 'nsub_linear' in self.models or 'efp_linear' in self.models or 'pfn' in self.models or 'efn' in self.models:
@@ -1222,8 +1224,8 @@ class AnalyzeFlavor(common_base.CommonBase):
             if self.y.shape[0] != len(result):
                 sys.exit(f'ERROR: {qa_observable}: {len(result)}, y shape: {self.y.shape}')
                
-            class1_indices = self.y
-            class2_indices = 1 - self.y
+            class1_indices = 1 - self.y
+            class2_indices = self.y
             result_class1 = result[class1_indices.astype(bool)]
             result_class2 = result[class2_indices.astype(bool)]
 
@@ -1267,8 +1269,8 @@ class AnalyzeFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     def plot_observable(self, X, y_train, xlabel='', ylabel='', filename='', xfontsize=12, yfontsize=16, logx=False, logy=False):
             
-        class1_indices = y_train
-        class2_indices = 1 - y_train
+        class1_indices = 1 - y_train
+        class2_indices = y_train
 
         observable_class1 = X[class1_indices.astype(bool)]
         observable_class2 = X[class2_indices.astype(bool)]
@@ -1302,9 +1304,8 @@ class AnalyzeFlavor(common_base.CommonBase):
             
         print(f'Plotting input EFP data {suffix}, d={d}...')
 
-        # Separate q/g
-        class1_indices = self.y
-        class2_indices = 1 - self.y
+        class1_indices = 1 - self.y
+        class2_indices = self.y
         X_q = X_EFP_d[class1_indices.astype(bool)]
         X_g = X_EFP_d[class2_indices.astype(bool)]
 
