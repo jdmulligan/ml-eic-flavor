@@ -1,0 +1,88 @@
+# Config file for u vs. d jet classification
+event_type: 'dis'
+flavor_type: 'u__d' # The double underscore specifies the two classes to consider
+
+jet_pt_min_list: [10]    # Can loop over different min jet pt 
+min_particle_pt: 0.
+kappa: [0.3, 0.5, 0.7]
+
+# Input files of training data
+input_files:
+ #- /rstorage/ml-eic-flavor/uds/LODIS_flavorjets_1.txt
+ - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_1.txt'
+ - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_2.txt'
+ - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_3.txt'
+ - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_4.txt'
+ - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_5.txt'
+ - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_6.txt'
+
+# Load labeled data
+n_train: 1000000
+n_val: 200000
+n_test: 200000
+
+# Select model: pfn, efn, efp_linear, efp_lasso, efp_dnn
+models: [pfn]
+
+# efp parameters
+dmax: 5                                             # maximal degree of the EFPs
+efp_measure: 'hadr'                                 # 
+efp_beta: 0.5                                       # Exponent of the pairwise distance
+
+efp_dnn:                    
+
+    learning_rate: [0.1, 0.01, 1.e-3, 1.e-4]    # (0.0001 cf 1810.05165)
+    loss: 'binary_crossentropy'                     # loss function - use categorical_crossentropy instead ?
+    metrics: ['accuracy']                           # measure accuracy during training
+    batch_size: 1000                    
+    epochs: 10                                      # number of training epochs
+
+efp_linear:
+
+    # Model hyperparameters -- SGDClassifier
+    sgd_loss: 'hinge'                               # cost function
+    sgd_penalty: ['l2', 'l1']                       # regularization term
+    sgd_alpha: [1e-5, 1e-4, 1e-3]                   # regularization strength
+    sgd_max_iter: 1000                              # max number of epochs
+    sgd_tol: [1e-5, 1e-4, 1e-3]                     # criteria to stop training
+    sgd_learning_rate: 'optimal'                    # learning schedule (learning rate decreases over time in proportion to alpha)
+    sgd_early_stopping: False                       # whether to stop training based on validation score
+
+    lda_tol: [1e-6, 1e-5, 1e-4, 1e-3, 5e-3]   # criteria to stop training
+
+    # Hyperparameter tuning
+    n_iter: 10                                      # number of random hyperparameter sets to try
+    cv: 5                                           # number of cross-validation folds
+
+efp_lasso:
+
+    # Set d value to train Lasso on
+    d_lasso: 4
+
+    alpha: [1.e-4, 0.0002, 0.0003, 0.0004, 0.0005, 0.0006, 0.0007, 0.0008, 0.0009, 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.05, 0.1]   # Constant multiplying the L1 term
+    max_iter: 10000                                 # max number of epochs
+    tol: 1e-6                                       # criteria to stop training
+
+pfn:
+
+    # Network architecture parameters
+    Phi_sizes: [100, 100, 256]
+    F_sizes: [100, 100, 100]
+    #Phi_sizes: [200, 200, 200, 200, 512]
+    #F_sizes: [200, 200, 200, 200, 200, 200]
+
+    # Network training parameters
+    epochs: 10
+    batch_size: 500
+    use_pids: False                                  # Use PID information (TODO: needs fixing)
+    
+efn:
+
+    # Network architecture parameters
+    Phi_sizes: [100, 100, 256]
+    F_sizes: [100, 100, 100]
+
+    # Network training parameters
+    learning_rate: 0.001
+    epochs: 10
+    batch_size: 500

@@ -100,15 +100,44 @@ class AnalyzeFlavor(common_base.CommonBase):
         with open(self.config_file, 'r') as stream:
           config = yaml.safe_load(stream)
 
+        self.event_type = config['event_type']
         self.flavor_type = config['flavor_type']
-          
+        if self.event_type == 'photoproduction':
+            self.flavor_map = {'q': 1,
+                               'g': 2
+                              }
+        elif self.event_type == 'dis':
+            self.flavor_map = {'anti-b': -5,
+                               'anti-c': -4,
+                               'anti-s': -3,
+                               'anti-u': -2,
+                               'anti-d': -1,
+                               'd': 1,
+                               'u': 2,
+                               's': 3,
+                               'c': 4,
+                               'b': 5
+                              }
+
+        # Set the class labels based on the flavor type
+        class_labels = self.flavor_type.split('__')
+        self.class1_label = class_labels[0]
+        self.class2_label = class_labels[1]
+        self.classes_class1 = self.class1_label.split('_')
+        self.classes_class2 = self.class2_label.split('_')
+        self.class1_ids = [self.flavor_map[class_i] for class_i in self.classes_class1]
+        self.class2_ids = [self.flavor_map[class_i] for class_i in self.classes_class2]
+        for class_i in self.classes_class1:
+            if class_i not in self.flavor_map.keys():
+                sys.exit(f'Class ({class_i}) not supported -- available classes are: {self.flavor_map.keys()}')
+        for class_i in self.classes_class2:
+            if class_i not in self.flavor_map.keys():
+                sys.exit(f'Class ({class_i}) not supported -- available classes are: {self.flavor_map.keys()}')
+        
         self.jet_pt_min_list= config['jet_pt_min_list']
         self.min_particle_pt = config['min_particle_pt']
         self.jetR = 0.4
         self.kappa = config['kappa']
-
-        self.q_label = config['q_label']
-        self.g_label = config['g_label']
 
         self.input_files = config['input_files']
 
@@ -206,21 +235,21 @@ class AnalyzeFlavor(common_base.CommonBase):
 
             # Determine total number of jets
             total_jets = int(self.y_total.size)
-            total_jets_g = int(np.sum(self.y_total))
-            total_jets_q = total_jets - total_jets_g
-            print(f'Total number of jets available: {total_jets_q} ({self.q_label}), {total_jets_g} ({self.g_label})')
+            total_jets_class2 = int(np.sum(self.y_total))
+            total_jets_class1 = total_jets - total_jets_class2
+            print(f'Total number of jets available: {total_jets_class1} ({self.class1_label}), {total_jets_class2} ({self.class2_label})')
 
             # If there is an imbalance, remove excess jets
-            if total_jets_q > total_jets_g:
-                indices_to_remove = np.where( np.isclose(self.y_total,0) )[0][total_jets_g:]
-            elif total_jets_q < total_jets_g:
-                indices_to_remove = np.where( np.isclose(self.y_total,1) )[0][total_jets_q:]
+            if total_jets_class1 > total_jets_class2:
+                indices_to_remove = np.where( np.isclose(self.y_total,0) )[0][total_jets_class2:]
+            elif total_jets_class1 < total_jets_class2:
+                indices_to_remove = np.where( np.isclose(self.y_total,1) )[0][total_jets_class1:]
             y_balanced = np.delete(self.y_total, indices_to_remove)
             X_particles_balanced = np.delete(X_particles_total, indices_to_remove, axis=0)
             total_jets = int(y_balanced.size)
-            total_jets_q = int(np.sum(y_balanced))
-            total_jets_g = total_jets - total_jets_q
-            print(f'Total number of jets available after balancing: {total_jets_q} ({self.q_label}), {total_jets_g} ({self.g_label})')
+            total_jets_class1 = int(np.sum(y_balanced))
+            total_jets_class2 = total_jets - total_jets_class1
+            print(f'Total number of jets available after balancing: {total_jets_class1} ({self.class1_label}), {total_jets_class2} ({self.class2_label})')
 
             # Reset the training,test,validation sizes based on the balanced number of jets
             self.n_total = total_jets
@@ -418,30 +447,35 @@ class AnalyzeFlavor(common_base.CommonBase):
         # Get statistics of each flavor
         flavor_array = jet_df[jet_df['ct']==1]['qg']
 
-        # Get flavor label from first particle of each jet
-        #   For flavor_type = qg:
-        #     1 = q     -->      0 = q
-        #     2 = g     -->      1 = g
-        #   For flavor_type = uds:
-        #     1 = d
-        #     2 = u
-        #     3 = s
-        #     4 = c
-        if self.flavor_type == 'qg':
-            labels = jet_df[jet_df.ct==1]['qg'].to_numpy()
-            labels -= 1
-        elif self.flavor_type == 'uds':
-            # TODO: implement multiple category classification
-            # For now we just do u vs. d
-            mask = (jet_df['qg']==1) | (jet_df['qg']==2)
-            jet_df = jet_df[mask]
-            labels = jet_df[jet_df.ct==1]['qg'].to_numpy()
-            labels = np.abs(labels)
-            print(f'initial labels: {labels}')
-            labels = np.where(labels == 1, 0, labels)
-            labels = np.where(labels == 2, 1, labels)
-            print(f'adjusted labels: {labels}')
-            print()
+        #---
+        # Set the ML labels based on the set of parton flavors to classify
+
+        # Remove entries that do not correspond to one of the requested class labels
+        requested_classes = self.class1_ids + self.class2_ids
+        labels_all = jet_df['qg'].to_numpy()
+        mask = np.isin(labels_all, requested_classes)
+        jet_df = jet_df[mask]
+
+        # Get new list of flavor labels from first particle of each jet in masked dataframe
+        labels = jet_df[jet_df.ct==1]['qg'].to_numpy()
+
+        # Find all labels from class1, and set them to 0
+        labels_1 = np.invert(np.isin(labels, self.class1_ids)).astype(int)
+
+        # Find all labels from class2, and set them to 1
+        labels_2 = np.isin(labels, self.class2_ids).astype(int)
+
+        # Check that the two are equal (i.e. that there are no unexpected class labels in the input file)
+        if np.array_equal(labels_1, labels_2):
+            labels = labels_1
+        else:
+            expected_ids = list(self.flavor_map.values())
+            unique_ids = np.unique(labels)
+            sys.exit(f'Unexpected class labels ({set(expected_ids).symmetric_difference(unique_ids)}) found in input file!')
+
+        print(f'class1: {self.classes_class1} ({self.class1_ids}) (ML label 0), class2: {self.classes_class2} ({self.class2_ids}) (ML label 1)')
+        print()
+        #---
 
         # Check pdg values that are present
         pdg_values_present = np.unique(np.absolute(jet_df['pid'].values))
@@ -1183,10 +1217,10 @@ class AnalyzeFlavor(common_base.CommonBase):
             if self.y.shape[0] != len(result):
                 sys.exit(f'ERROR: {qa_observable}: {len(result)}, y shape: {self.y.shape}')
                
-            q_indices = self.y
-            g_indices = 1 - self.y
-            result_q = result[q_indices.astype(bool)]
-            result_g = result[g_indices.astype(bool)]
+            class1_indices = self.y
+            class2_indices = 1 - self.y
+            result_class1 = result[class1_indices.astype(bool)]
+            result_class2 = result[class2_indices.astype(bool)]
 
             # Set some labels
             if 'jet_charge' in qa_observable:
@@ -1196,7 +1230,7 @@ class AnalyzeFlavor(common_base.CommonBase):
             else:
                 ylabel = ''
                 xlabel = rf'{qa_observable}'
-                bins = np.linspace(0, np.amax(result_g), 20)
+                bins = np.linspace(0, np.amax(result_class2), 20)
             plt.xlabel(xlabel, fontsize=14)
             plt.ylabel(ylabel, fontsize=16)
 
@@ -1206,13 +1240,13 @@ class AnalyzeFlavor(common_base.CommonBase):
                 stat='density'
 
             # Construct dataframes for histplot
-            df_q = pd.DataFrame(result_q, columns=[xlabel])
-            df_g = pd.DataFrame(result_g, columns=[xlabel])
+            df_class1 = pd.DataFrame(result_class1, columns=[xlabel])
+            df_class2 = pd.DataFrame(result_class2, columns=[xlabel])
             
             # Add label columns to each df to differentiate them for plotting
-            df_q['generator'] = np.repeat(self.q_label, result_q.shape[0])
-            df_g['generator'] = np.repeat(self.g_label, result_g.shape[0])
-            df = df_q.append(df_g, ignore_index=True)
+            df_class1['generator'] = np.repeat(self.class1_label, result_class1.shape[0])
+            df_class2['generator'] = np.repeat(self.class2_label, result_class2.shape[0])
+            df = df_class1.append(df_class2, ignore_index=True)
 
             # Histplot
             h = sns.histplot(df, x=xlabel, hue='generator', stat=stat, bins=bins, element='step', common_norm=False)
@@ -1228,18 +1262,18 @@ class AnalyzeFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     def plot_observable(self, X, y_train, xlabel='', ylabel='', filename='', xfontsize=12, yfontsize=16, logx=False, logy=False):
             
-        q_indices = y_train
-        g_indices = 1 - y_train
+        class1_indices = y_train
+        class2_indices = 1 - y_train
 
-        observable_q = X[q_indices.astype(bool)]
-        observable_g = X[g_indices.astype(bool)]
+        observable_class1 = X[class1_indices.astype(bool)]
+        observable_class2 = X[class2_indices.astype(bool)]
 
-        df_q = pd.DataFrame(observable_q, columns=[xlabel])
-        df_g = pd.DataFrame(observable_g, columns=[xlabel])
+        df_class1 = pd.DataFrame(observable_class1, columns=[xlabel])
+        df_class2 = pd.DataFrame(observable_class2, columns=[xlabel])
 
-        df_q['generator'] = np.repeat(self.AA_label, observable_q.shape[0])
-        df_g['generator'] = np.repeat(self.pp_label, observable_g.shape[0])
-        df = df_q.append(df_g, ignore_index=True)
+        df_class1['generator'] = np.repeat(self.class1_label, observable_class1.shape[0])
+        df_class2['generator'] = np.repeat(self.class2_label, observable_class2.shape[0])
+        df = df_class1.append(df_class2, ignore_index=True)
 
         bins = np.linspace(np.amin(X), np.amax(X), 50)
         stat='density'
@@ -1264,22 +1298,22 @@ class AnalyzeFlavor(common_base.CommonBase):
         print(f'Plotting input EFP data {suffix}, d={d}...')
 
         # Separate q/g
-        q_indices = self.y
-        g_indices = 1 - self.y
-        X_q = X_EFP_d[q_indices.astype(bool)]
-        X_g = X_EFP_d[g_indices.astype(bool)]
+        class1_indices = self.y
+        class2_indices = 1 - self.y
+        X_q = X_EFP_d[class1_indices.astype(bool)]
+        X_g = X_EFP_d[class2_indices.astype(bool)]
 
         # Get labels
         graphs = [str(x) for x in self.graphs[:4]]
 
         # Construct dataframes for scatter matrix plotting
-        df_q = pd.DataFrame(X_q, columns=graphs)
-        df_g = pd.DataFrame(X_g, columns=graphs)
+        df_class1 = pd.DataFrame(X_class1, columns=graphs)
+        df_class1 = pd.DataFrame(X_class2, columns=graphs)
         
         # Add label columns to each df to differentiate them for plotting
-        df_q['generator'] = np.repeat(self.g_label, X_q.shape[0])
-        df_g['generator'] = np.repeat(self.q_label, X_g.shape[0])
-        df = df_q.append(df_g, ignore_index=True)
+        df_class1['generator'] = np.repeat(self.class1_label, X_class1.shape[0])
+        df_class2['generator'] = np.repeat(self.class2_label, X_class2.shape[0])
+        df = df_class1.append(df_class2, ignore_index=True)
 
         # Plot scatter matrix
         g = sns.pairplot(df, corner=True, hue='generator', plot_kws={'alpha':0.1})
@@ -1302,7 +1336,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process qg')
     parser.add_argument('-c', '--configFile', action='store',
                         type=str, metavar='configFile',
-                        default='config/qg.yaml',
+                        default='config/u_d.yaml',
                         help='Path of config file for analysis')
     parser.add_argument('-o', '--outputDir', action='store',
                         type=str, metavar='outputDir',

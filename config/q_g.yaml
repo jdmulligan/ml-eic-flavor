@@ -1,22 +1,14 @@
-# Config file for u/d/s/c jet classification
-flavor_type: 'uds' # DIS
+# Config file for q vs g jet classification
+event_type: 'protoproduction'
+flavor_type: 'q_g'
 
 jet_pt_min_list: [10]    # Can loop over different min jet pt 
 min_particle_pt: 0.
 kappa: [0.3, 0.5, 0.7]
 
-# Classification labels
-q_label: 'u'
-g_label: 'd'
-
 # Input files of training data
 input_files:
- - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_1.txt'
- - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_2.txt'
- - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_3.txt'
- - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_4.txt'
- - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_5.txt'
- - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_6.txt'
+ - 'training_data/photojets.txt'
 
 # Load labeled data
 n_train: 1000000
@@ -24,7 +16,7 @@ n_val: 200000
 n_test: 200000
 
 # Select model: pfn, efn, efp_linear, efp_lasso, efp_dnn
-models: [pfn]
+models: [pfn, efn, efp_linear, efp_dnn]
 
 # efp parameters
 dmax: 5                                             # maximal degree of the EFPs
@@ -76,7 +68,7 @@ pfn:
     # Network training parameters
     epochs: 10
     batch_size: 500
-    use_pids: False                                  # Use PID information (TODO: needs fixing)
+    use_pids: True                                  # Use PID information (this option is currently ignored)
     
 efn:
 
