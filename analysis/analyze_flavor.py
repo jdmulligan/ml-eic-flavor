@@ -346,13 +346,14 @@ class AnalyzeFlavor(common_base.CommonBase):
         for i,input_file in enumerate(self.input_files):
 
             jet_df = pd.read_csv(input_file, sep='\s+')
-            X_particles, y = self.create_jet_array(jet_df, jet_pt_min)
+            X_particles, y, flavor_array = self.create_jet_array(jet_df, jet_pt_min)
             print(f'X_particles shape: {X_particles.shape}')
             print(f'y shape: {y.shape}')
 
             if i == 0:
                 X_particles_total = X_particles
                 y_total = y
+                flavor_array_total = flavor_array
             else:
 
                 # Zero pad according to the largest n_particles dimension
@@ -365,6 +366,7 @@ class AnalyzeFlavor(common_base.CommonBase):
 
                 X_particles_total = np.concatenate([X_particles_total, X_particles])
                 y_total = np.concatenate([y_total, y])
+                flavor_array_total = np.concatenate([flavor_array_total, flavor_array])
 
             print()
             print(f'X_particles_total shape: {X_particles_total.shape}')
@@ -374,6 +376,17 @@ class AnalyzeFlavor(common_base.CommonBase):
             # If enough jets have been found, then return
             if y_total.shape[0] > self.n_total:
                 break
+
+        # Plot statistics for each flavor
+        flavor, counts = np.unique(flavor_array_total, return_counts=True)
+        flavor_count_dict = dict(zip(flavor, counts))
+        print(f'flavor statistics: {flavor_count_dict}') 
+        print()
+        plt.bar(list(flavor_count_dict.keys()), flavor_count_dict.values(), color='g', log=True)
+        plt.ylabel("counts")
+        plt.xlabel("flavor id")
+        plt.savefig(os.path.join(self.output_dir, 'flavor_statistics.pdf'))
+        plt.close()
 
         return X_particles_total, y_total
 
@@ -401,6 +414,9 @@ class AnalyzeFlavor(common_base.CommonBase):
 
         # Filter by jet pt
         jet_df = jet_df[jet_df['jetpT']>jet_pt_min]
+
+        # Get statistics of each flavor
+        flavor_array = jet_df[jet_df['ct']==1]['qg']
 
         # Get flavor label from first particle of each jet
         #   For flavor_type = qg:
@@ -470,7 +486,7 @@ class AnalyzeFlavor(common_base.CommonBase):
         jet_array = np.array(jet_list)
         print(f'(n_jets, n_particles, n_particle_info) = {jet_array.shape}')
 
-        return jet_array, labels
+        return jet_array, labels, flavor_array
 
     #---------------------------------------------------------------
     # Compute some individual jet observables
