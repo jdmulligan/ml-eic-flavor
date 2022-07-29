@@ -434,10 +434,8 @@ class AnalyzeFlavor(common_base.CommonBase):
         jet_df = jet_df[jet_df.jet > 0]
 
         # Add columns of mass and charge
-        # Note that some PIDs are not recognized by the energyflow functions (311 -- K0)
-        # TODO: check whether we want to write these as K0L/K0S (for now we set error_on_unknown=False)
-        jet_df['m'] = energyflow.pids2ms(jet_df['pid'], error_on_unknown=False)
-        jet_df['charge'] = energyflow.pids2chrgs(jet_df['pid'], error_on_unknown=False)
+        jet_df['m'] = energyflow.pids2ms(jet_df['pid'], error_on_unknown=True)
+        jet_df['charge'] = energyflow.pids2chrgs(jet_df['pid'], error_on_unknown=True)
 
         # Switch order: (pt, eta, phi, pid, m, charge) --> (pt, eta, phi, m, pid, charge)
         columns = list(jet_df.columns)
