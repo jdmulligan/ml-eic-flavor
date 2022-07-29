@@ -490,8 +490,8 @@ class AnalyzeFlavor(common_base.CommonBase):
 
         # Particles expected for c*tau > 1cm: (gamma, e-, mu-, pi+, K+, K_L0, K_S0, p+, n, Sigma+, Sigma-, Xi-, Xi0, Omega-, Lambda0)
         #     and antiparticles for (e-, mu-, pi+, K+, p+, n, Sigma+, Sigma-, Xi-, Xi0, Omega-, Lambda0)
-        reference_particles_pdg = [22, 11, 13, 211, 130, 321, 310, 2212, 2112, 3222, 3112, 3312, 3322, 3334, 3122] 
-        #                             -11, -13, -211, -130, -2212, -2112, -3222, -3112, -3312, -3322, -3334, -3122]
+        reference_particles_pdg = [22, 11, 13, 211, 321, 130, 310, 2212, 2112, 3222, 3112, 3312, 3322, 3334, 3122, 
+                                      -11, -13, -211, -321, -2212, -2112, -3222, -3112, -3312, -3322, -3334, -3122]
 
         for pdg_value in reference_particles_pdg:
             if pdg_value not in pdg_values_present:
