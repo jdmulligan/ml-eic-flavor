@@ -1120,7 +1120,7 @@ class AnalyzeFlavor(common_base.CommonBase):
     #---------------------------------------------------------------         
     def my_remap_pids(self,events, pid_i=3, error_on_unknown=True):
         # PDGid to small float dictionary (neutral & positive charge are assigned a positive number)
-        PID2FLOAT_MAP = { 22: +0,        # gamma
+        PID2FLOAT_MAP = { 22: +0.0,      # gamma
                           11: -0.1,      # e^-
                          -11: +0.1,      # e^+
                           13: -0.2,      # mu^-
@@ -1134,19 +1134,19 @@ class AnalyzeFlavor(common_base.CommonBase):
                           2212: +0.7,    # p
                          -2212: -0.7,    # p bar
                           2112: +0.8,    # n
-                         -2112: -0.8,    # n bar
-                          3222: +0.9,    # Sigma^+ (uus)
-                         -3222: -0.9,    # Sigma^+ bar
-                          3112: -1.0,    # Sigma^- (dds)
-                         -3112: +1.0,    # Sigma^- bar
-                          3312: -1.1,    # Xi^- (dss)
-                         -3312: +1.1,    # Xi^- bar
-                          3322: +1.2,    # Xi^0 (uss)
-                         -3322: +1.3,    # Xi^0 bar
-                          3334: -1.4,    # Omega^- (sss)
-                         -3334: +1.4,    # Omega^- bar
-                          3122: +1.5,    # Lambda^0 (uds)
-                         -3122: +1.6}    # Lambda^0 bar
+                         -2112: +0.9,    # n bar
+                          3222: +1.0,    # Sigma^+ (uus)
+                         -3222: -1.0,    # Sigma^+ bar
+                          3112: -1.1,    # Sigma^- (dds)
+                         -3112: +1.1,    # Sigma^- bar
+                          3312: -1.2,    # Xi^- (dss)
+                         -3312: +1.2,    # Xi^- bar
+                          3322: +1.3,    # Xi^0 (uss)
+                         -3322: +1.4,    # Xi^0 bar
+                          3334: -1.5,    # Omega^- (sss)
+                         -3334: +1.5,    # Omega^- bar
+                          3122: +1.6,    # Lambda^0 (uds)
+                         -3122: +1.7}    # Lambda^0 bar
 
         """Remaps PDG id numbers to small floats for use in a neural network.
         `events` are modified in place and nothing is returned.
