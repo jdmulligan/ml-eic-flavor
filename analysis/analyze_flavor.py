@@ -1120,7 +1120,8 @@ class AnalyzeFlavor(common_base.CommonBase):
     #---------------------------------------------------------------         
     def my_remap_pids(self,events, pid_i=3, error_on_unknown=True):
         # PDGid to small float dictionary (neutral & positive charge are assigned a positive number)
-        PID2FLOAT_MAP = { 22: +0.0,      # gamma
+        PID2FLOAT_MAP = { 0: +0.0,       # no particle
+                          22: +0.05,     # gamma
                           11: -0.1,      # e^-
                          -11: +0.1,      # e^+
                           13: -0.2,      # mu^-
