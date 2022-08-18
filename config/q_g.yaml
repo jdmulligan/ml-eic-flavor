@@ -1,6 +1,6 @@
 # Config file for q vs g jet classification
-event_type: 'protoproduction'
-flavor_type: 'q_g'
+event_type: 'photoproduction'
+flavor_type: 'q__g' # The double underscore specifies the two classes to consider
 
 jet_pt_min_list: [10]    # Can loop over different min jet pt 
 min_particle_pt: 0.
@@ -8,16 +8,16 @@ kappa: [0.3, 0.5, 0.7]
 
 # Input files of training data
 input_files:
- - 'training_data/photojets.txt'
+ - '/pscratch/sd/j/jdmull/ml-eic-flavor/qg/photoproduction_1.txt'
 
 # Load labeled data
-n_train: 1000000
-n_val: 200000
-n_test: 200000
+n_train: 5
+n_val: 2
+n_test: 2
 balance_samples: True
 
 # Select model: pfn, efn, efp_linear, efp_lasso, efp_dnn
-models: [pfn, efn, efp_linear, efp_dnn]
+models: [pfn]
 
 # efp parameters
 dmax: 5                                             # maximal degree of the EFPs
@@ -69,7 +69,7 @@ pfn:
     # Network training parameters
     epochs: 10
     batch_size: 500
-    use_pids: True                                  # Use PID information (this option is currently ignored)
+    use_pids: False                                  # Use PID information (this option is currently ignored)
     
 efn:
 
