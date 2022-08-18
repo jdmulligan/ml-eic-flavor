@@ -419,7 +419,7 @@ class AnalyzeFlavor(common_base.CommonBase):
         plt.bar(list(flavor_count_dict.keys()), flavor_count_dict.values(), color='g', log=True)
         plt.ylabel("counts")
         plt.xlabel("flavor id")
-        plt.savefig(os.path.join(self.output_dir, 'flavor_statistics.pdf'))
+        plt.savefig(os.path.join(self.output_dir, f'flavor_statistics_pt{jet_pt_min}.pdf'))
         plt.close()
 
         return X_particles_total, y_total
