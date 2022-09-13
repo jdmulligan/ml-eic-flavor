@@ -535,6 +535,8 @@ class AnalyzeFlavor(common_base.CommonBase):
 
         self.qa_results = defaultdict(list)
         self.qa_observables = [f'jet_charge_k{kappa}' for kappa in self.kappa]
+        self.qa_observables += [f'jet_charge0_k{kappa}_multiplicity' for kappa in self.kappa]
+        self.qa_observables += ['particle_multiplicity']
 
         # Compute jet charge
         for kappa in self.kappa:
@@ -550,6 +552,29 @@ class AnalyzeFlavor(common_base.CommonBase):
                     jet_charge += charge * np.power(pt, kappa)
                 jet_charge = jet_charge / np.power(jet_pt, kappa)
                 self.qa_results[f'jet_charge_k{kappa}'].append(jet_charge)
+
+                # Check properties of charge=0 jets
+                if np.isclose(jet_charge, 0.):
+                    pid = jet[:,4]
+                    pid_nonzero = pid[ pid != 0]
+                    self.qa_results[f'jet_charge0_k{kappa}_multiplicity'].append(pid_nonzero.size)
+
+                    # Check that the jet contains no charged particles
+                    # Particles expected for c*tau > 1cm: (Omega-, Lambda0)
+                    #     and antiparticles for (Omega-, Lambda0)
+                    neutral_pids = np.array([22, 130, 310, 2112, 3322, 3122,
+                                             -2112, -3322, -3122])
+                    charged_pids = np.array([11, 13, 211, 321, 2212, 3222, 3112, 3312, 3334
+                                             -11, -13, -211, -321, -2212, -3222, -3112, -3312, -3334])
+                    if np.any(np.in1d(pid_nonzero, charged_pids)):
+                        print(pid_nonzero)
+                        sys.exit(f'A jet with charge=0 has charged constituents!')
+
+        # Compute particle multiplicity
+        for jet in self.X_particles:
+            pid = jet[:,4]
+            pid_nonzero = pid[ pid != 0]
+            self.qa_results[f'particle_multiplicity'].append(pid_nonzero.size)
 
     #---------------------------------------------------------------
     # Train models
@@ -1239,48 +1264,62 @@ class AnalyzeFlavor(common_base.CommonBase):
         for qa_observable in self.qa_observables:
 
             result = np.array(self.qa_results[qa_observable])
-            if self.y.shape[0] != len(result):
-                sys.exit(f'ERROR: {qa_observable}: {len(result)}, y shape: {self.y.shape}')
-               
-            class1_indices = 1 - self.y
-            class2_indices = self.y
-            result_class1 = result[class1_indices.astype(bool)]
-            result_class2 = result[class2_indices.astype(bool)]
 
-            # Set some labels
-            if 'jet_charge' in qa_observable:
-                xlabel = rf'$Q_{{\kappa}}$'
-                ylabel = rf'$\frac{{1}}{{\sigma}} \frac{{d\sigma}}{{dQ_{{\kappa}} }}$'
-                bins = np.linspace(-2, 2., 100)
+            # If same number of entries as labels, then plot separated by class label 
+            if self.y.shape[0] == len(result) and 'multiplicity' not in qa_observable:
+
+                class1_indices = 1 - self.y
+                class2_indices = self.y
+                result_class1 = result[class1_indices.astype(bool)]
+                result_class2 = result[class2_indices.astype(bool)]
+
+                # Set some labels
+                if 'jet_charge' in qa_observable:
+                    xlabel = rf'$Q_{{\kappa}}$'
+                    ylabel = rf'$\frac{{1}}{{\sigma}} \frac{{d\sigma}}{{dQ_{{\kappa}} }}$'
+                    bins = np.linspace(-2, 2., 100)
+                else:
+                    ylabel = ''
+                    xlabel = rf'{qa_observable}'
+                    bins = np.linspace(0, np.amax(result_class2), 20)
+                plt.xlabel(xlabel, fontsize=14)
+                plt.ylabel(ylabel, fontsize=16)
+
+                if qa_observable == 'jet_pt':
+                    stat='count'
+                else:
+                    stat='density'
+
+                # Construct dataframes for histplot
+                df_class1 = pd.DataFrame(result_class1, columns=[xlabel])
+                df_class2 = pd.DataFrame(result_class2, columns=[xlabel])
+                
+                # Add label columns to each df to differentiate them for plotting
+                df_class1['generator'] = np.repeat(self.class1_label, result_class1.shape[0])
+                df_class2['generator'] = np.repeat(self.class2_label, result_class2.shape[0])
+                df = df_class1.append(df_class2, ignore_index=True)
+
+                # Histplot
+                h = sns.histplot(df, x=xlabel, hue='generator', stat=stat, bins=bins, element='step', common_norm=False)
+                h.legend_.set_title(None)
+                plt.setp(h.get_legend().get_texts(), fontsize='14') # for legend text
+
+                plt.tight_layout()
+                plt.savefig(os.path.join(self.output_dir_i, f'{qa_observable}.pdf'))
+                plt.close()
+
+            # Otherwise, plot distribution without dividing by class label
             else:
-                ylabel = ''
-                xlabel = rf'{qa_observable}'
-                bins = np.linspace(0, np.amax(result_class2), 20)
-            plt.xlabel(xlabel, fontsize=14)
-            plt.ylabel(ylabel, fontsize=16)
 
-            if qa_observable == 'jet_pt':
-                stat='count'
-            else:
-                stat='density'
+                if 'multiplicity' in qa_observable:
+                    bins = np.linspace(-0.5, 30.5, 32)
+                else:
+                    bins = 'auto'
+                plt.hist(result, bins=bins)
 
-            # Construct dataframes for histplot
-            df_class1 = pd.DataFrame(result_class1, columns=[xlabel])
-            df_class2 = pd.DataFrame(result_class2, columns=[xlabel])
-            
-            # Add label columns to each df to differentiate them for plotting
-            df_class1['generator'] = np.repeat(self.class1_label, result_class1.shape[0])
-            df_class2['generator'] = np.repeat(self.class2_label, result_class2.shape[0])
-            df = df_class1.append(df_class2, ignore_index=True)
-
-            # Histplot
-            h = sns.histplot(df, x=xlabel, hue='generator', stat=stat, bins=bins, element='step', common_norm=False)
-            h.legend_.set_title(None)
-            plt.setp(h.get_legend().get_texts(), fontsize='14') # for legend text
-
-            plt.tight_layout()
-            plt.savefig(os.path.join(self.output_dir_i, f'{qa_observable}.pdf'))
-            plt.close()
+                plt.tight_layout()
+                plt.savefig(os.path.join(self.output_dir_i, f'{qa_observable}.pdf'))
+                plt.close()
 
     #---------------------------------------------------------------
     # Plot q vs. g
