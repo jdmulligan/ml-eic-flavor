@@ -1,6 +1,7 @@
 # Config file for q vs g jet classification
 event_type: 'photoproduction'
-flavor_type: 'q__g' # The double underscore specifies the two classes to consider
+classification_type: 'jet'
+classes: 'q__g' # The double underscore specifies the two classes to consider
 
 jet_pt_min_list: [10]    # Can loop over different min jet pt 
 min_particle_pt: 0.
@@ -69,7 +70,7 @@ pfn:
     # Network training parameters
     epochs: 10
     batch_size: 500
-    use_pids: False                                  # Use PID information (this option is currently ignored)
+    use_pids: True
     
 efn:
 

@@ -73,7 +73,7 @@ class AnalyzeFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     # Constructor
     #---------------------------------------------------------------
-    def __init__(self, config_file='', output_dir='', flavor_type='', **kwargs):
+    def __init__(self, config_file='', output_dir='', **kwargs):
         super(common_base.CommonBase, self).__init__(**kwargs)
         
         self.config_file = config_file
@@ -101,39 +101,66 @@ class AnalyzeFlavor(common_base.CommonBase):
           config = yaml.safe_load(stream)
 
         self.event_type = config['event_type']
-        self.flavor_type = config['flavor_type']
-        if self.event_type == 'photoproduction':
-            self.flavor_map = {'q': 1,
-                               'g': 2
-                              }
-        elif self.event_type == 'dis':
-            self.flavor_map = {'anti-b': -5,
-                               'anti-c': -4,
-                               'anti-s': -3,
-                               'anti-u': -2,
-                               'anti-d': -1,
-                               'd': 1,
-                               'u': 2,
-                               's': 3,
-                               'c': 4,
-                               'b': 5
-                              }
+        self.classification_type = config['classification_type']
+        self.classes = config['classes']
 
-        # Set the class labels based on the flavor type
-        class_labels = self.flavor_type.split('__')
+        if self.classification_type == 'jet':
+
+            if self.event_type == 'photoproduction':
+                self.class_map = {'q': 1,
+                                  'g': 2
+                                 }
+            elif self.event_type == 'dis':
+                self.class_map = {'anti-b': -5,
+                                  'anti-c': -4,
+                                  'anti-s': -3,
+                                  'anti-u': -2,
+                                  'anti-d': -1,
+                                  'd': 1,
+                                  'u': 2,
+                                  's': 3,
+                                  'c': 4,
+                                  'b': 5
+                                 }
+
+        elif self.classification_type == 'event':
+
+            if self.event_type == 'photoproduction':
+                # See table 16: https://pythia.org/download/pdf/lutp0613man2.pdf
+                self.class_map = {'qq --> qq': 11,
+                                  'qqbar --> qqbar': 12,
+                                  'qqbar --> gg': 13,
+                                  'gg --> qqbar': 53,
+                                  'gg --> gg': 68,
+                                  'qg --> qg': 28,
+                                  'LO DIS': 99,                # 'gamma* q --> q'
+                                  'transverse QCDC': 131,      # 'gamma*T q --> qg'
+                                  'longitudinal QCDC': 132,    # 'gamma*L q --> qg'
+                                  'transverse PGF': 135,       # 'gamma*T g --> qqbar'
+                                  'longitudinal PGF': 136      # 'gamma*L g --> qqbar'
+                                 }
+            elif self.event_type == 'dis':
+                sys.exit(f'ERROR: event classification not implemented for DIS events')
+
+        # Set the class labels based on the class type
+        class_labels = self.classes.split('__')
         self.class1_label = class_labels[0]
         self.class2_label = class_labels[1]
         self.classes_class1 = self.class1_label.split('_')
         self.classes_class2 = self.class2_label.split('_')
-        self.class1_ids = [self.flavor_map[class_i] for class_i in self.classes_class1]
-        self.class2_ids = [self.flavor_map[class_i] for class_i in self.classes_class2]
+        self.class1_ids = [self.class_map[class_i] for class_i in self.classes_class1]
+        self.class2_ids = [self.class_map[class_i] for class_i in self.classes_class2]
         for class_i in self.classes_class1:
-            if class_i not in self.flavor_map.keys():
-                sys.exit(f'Class ({class_i}) not supported -- available classes are: {self.flavor_map.keys()}')
+            if class_i not in self.class_map.keys():
+                sys.exit(f'Class ({class_i}) not supported -- available classes are: {self.class_map.keys()}')
         for class_i in self.classes_class2:
-            if class_i not in self.flavor_map.keys():
-                sys.exit(f'Class ({class_i}) not supported -- available classes are: {self.flavor_map.keys()}')
+            if class_i not in self.class_map.keys():
+                sys.exit(f'Class ({class_i}) not supported -- available classes are: {self.class_map.keys()}')
         
+        if self.classification_type == 'event':
+            self.n_jets_max = config['n_jets_max']
+            self.n_particles_per_jet_max = config['n_particles_per_jet_max']
+
         self.jet_pt_min_list= config['jet_pt_min_list']
         self.min_particle_pt = config['min_particle_pt']
         self.jetR = 0.4
@@ -150,9 +177,10 @@ class AnalyzeFlavor(common_base.CommonBase):
         self.val_frac = 1. * self.n_val / (self.n_train + self.n_val)
         self.balance_samples = config['balance_samples']
         
-        self.dmax = config['dmax']
-        self.efp_measure = config['efp_measure']
-        self.efp_beta = config['efp_beta']
+        if 'dmax' in config:
+            self.dmax = config['dmax']
+            self.efp_measure = config['efp_measure']
+            self.efp_beta = config['efp_beta']
 
         self.random_state = None  # seed for shuffling data (set to an int to have reproducible results)
 
@@ -380,14 +408,14 @@ class AnalyzeFlavor(common_base.CommonBase):
         for i,input_file in enumerate(self.input_files):
 
             jet_df = pd.read_csv(input_file, sep='\s+')
-            X_particles, y, flavor_array = self.create_jet_array(jet_df, jet_pt_min)
+            X_particles, y, class_array = self.create_jet_array(jet_df, jet_pt_min)
             print(f'X_particles shape: {X_particles.shape}')
             print(f'y shape: {y.shape}')
 
             if i == 0:
                 X_particles_total = X_particles
                 y_total = y
-                flavor_array_total = flavor_array
+                class_array_total = class_array
             else:
 
                 # Zero pad according to the largest n_particles dimension
@@ -400,7 +428,7 @@ class AnalyzeFlavor(common_base.CommonBase):
 
                 X_particles_total = np.concatenate([X_particles_total, X_particles])
                 y_total = np.concatenate([y_total, y])
-                flavor_array_total = np.concatenate([flavor_array_total, flavor_array])
+                class_array_total = np.concatenate([class_array_total, class_array])
 
             print()
             print(f'X_particles_total shape: {X_particles_total.shape}')
@@ -411,15 +439,15 @@ class AnalyzeFlavor(common_base.CommonBase):
             if y_total.shape[0] > self.n_total:
                 break
 
-        # Plot statistics for each flavor
-        flavor, counts = np.unique(flavor_array_total, return_counts=True)
-        flavor_count_dict = dict(zip(flavor, counts))
-        print(f'flavor statistics: {flavor_count_dict}') 
+        # Plot statistics for each class
+        classes, counts = np.unique(class_array_total, return_counts=True)
+        classes_count_dict = dict(zip(classes, counts))
+        print(f'class statistics: {classes_count_dict}') 
         print()
-        plt.bar(list(flavor_count_dict.keys()), flavor_count_dict.values(), color='g', log=True)
+        plt.bar(list(classes_count_dict.keys()), classes_count_dict.values(), color='g', log=True)
         plt.ylabel("counts")
-        plt.xlabel("flavor id")
-        plt.savefig(os.path.join(self.output_dir, f'flavor_statistics_pt{jet_pt_min}.pdf'))
+        plt.xlabel("class id")
+        plt.savefig(os.path.join(self.output_dir, f'class_statistics_pt{jet_pt_min}.pdf'))
         plt.close()
 
         return X_particles_total, y_total
@@ -430,7 +458,13 @@ class AnalyzeFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     def create_jet_array(self, jet_df, jet_pt_min):
 
-        # First, remove the particles outside the jets
+        # Set column name to get classes from
+        if self.classification_type == 'jet':
+            class_key = 'qg'
+        elif self.classification_type == 'event':
+            class_key = 'proc'
+
+        # First, remove the particles outside the jets (only present in DIS events)
         jet_df = jet_df[jet_df.jet > 0]
 
         # Add columns of mass and charge
@@ -447,20 +481,26 @@ class AnalyzeFlavor(common_base.CommonBase):
         # Filter by jet pt
         jet_df = jet_df[jet_df['jetpT']>jet_pt_min]
 
-        # Get statistics of each flavor
-        flavor_array = jet_df[jet_df['ct']==1]['qg']
+        # Get statistics of each class type
+        if self.classification_type == 'jet':
+            class_array = jet_df[jet_df['ct']==1][class_key]
+        elif self.classification_type == 'event':
+            class_array = np.array([event[1][class_key].iloc[0] for event in jet_df.groupby('event')])
 
         #---
-        # Set the ML labels based on the set of parton flavors to classify
+        # Set the ML labels based on the set of classes to classify
 
         # Remove entries that do not correspond to one of the requested class labels
         requested_classes = self.class1_ids + self.class2_ids
-        labels_all = jet_df['qg'].to_numpy()
+        labels_all = jet_df[class_key].to_numpy()
         mask = np.isin(labels_all, requested_classes)
         jet_df = jet_df[mask]
 
-        # Get new list of flavor labels from first particle of each jet in masked dataframe
-        labels = jet_df[jet_df.ct==1]['qg'].to_numpy()
+        # Get new list of class labels from masked dataframe
+        if self.classification_type == 'jet':
+            labels = jet_df[jet_df.ct==1][class_key].to_numpy()
+        elif self.classification_type == 'event':
+            labels = np.array([event[1][class_key].iloc[0] for event in jet_df.groupby('event')])
 
         # Find all labels from class1, and set them to 0
         labels_1 = np.invert(np.isin(labels, self.class1_ids)).astype(int)
@@ -472,7 +512,7 @@ class AnalyzeFlavor(common_base.CommonBase):
         if np.array_equal(labels_1, labels_2):
             labels = labels_1
         else:
-            expected_ids = list(self.flavor_map.values())
+            expected_ids = list(self.class_map.values())
             unique_ids = np.unique(labels)
             sys.exit(f'Unexpected class labels ({set(expected_ids).symmetric_difference(unique_ids)}) found in input file!')
 
@@ -489,7 +529,7 @@ class AnalyzeFlavor(common_base.CommonBase):
         # Particles expected for c*tau > 1cm: (gamma, e-, mu-, pi+, K+, K_L0, K_S0, p+, n, Sigma+, Sigma-, Xi-, Xi0, Omega-, Lambda0)
         #     and antiparticles for (e-, mu-, pi+, K+, p+, n, Sigma+, Sigma-, Xi-, Xi0, Omega-, Lambda0)
         reference_particles_pdg = [22, 11, 13, 211, 321, 130, 310, 2212, 2112, 3222, 3112, 3312, 3322, 3334, 3122, 
-                                      -11, -13, -211, -321, -2212, -2112, -3222, -3112, -3312, -3322, -3334, -3122]
+                                    -11, -13, -211, -321, -2212, -2112, -3222, -3112, -3312, -3322, -3334, -3122]
 
         for pdg_value in reference_particles_pdg:
             if pdg_value not in pdg_values_present:
@@ -505,27 +545,75 @@ class AnalyzeFlavor(common_base.CommonBase):
         # Translate dataframe into 3D numpy array: (jets, particles, particle info)
         #                          where particle info is: (pt, eta, phi, m, pid, charge)
         # Based on: https://stackoverflow.com/questions/52621497/pandas-group-by-column-and-transform-the-data-to-numpy-array
+        if self.classification_type == 'jet':
 
-        # First, drop unnecessary columns
-        # TODO: For now, we neglect which event the jets come from
-        # TODO: For now, we don't select on the process
-        #   For flavor_type = qg: https://eic.github.io/software/pythia6.html
-        #   For flavor_type = uds: always 99 for the LO DIS process
-        jet_df = jet_df.drop(columns=['proc', 'event', 'qg', 'ct', 'jetpT'])
+            # Process selection
+            #   For classes = uds: always 99 for the LO DIS process
+            #   For classes = qg: https://eic.github.io/software/pythia6.html
+            if self.event_type == 'photoproduction':
+                sys.exit(f'ERROR: process selection not yet implemented for jet classification for photoproduction events!')
 
-        # Generate particle indices for each jet
-        jet_df_grouped = jet_df.groupby(['jet'])
-        particle_indices = jet_df_grouped.cumcount()
+            # First, drop unnecessary columns
+            jet_df = jet_df.drop(columns=['proc', 'event', 'qg', 'ct', 'jetpT'])
 
-        # Zero pad                                                                                
-        jet_df_zero_padded = jet_df.set_index(['jet', particle_indices]).unstack(fill_value=0).stack()
+            # Generate particle indices for each jet
+            jet_df_grouped = jet_df.groupby(['jet'])
+            particle_indices = jet_df_grouped.cumcount()
 
-        # Group and convert to array
-        jet_list = jet_df_zero_padded.groupby(level=0).apply(lambda x: x.values.tolist()).tolist()                                                                                                               
-        jet_array = np.array(jet_list)
-        print(f'(n_jets, n_particles, n_particle_info) = {jet_array.shape}')
+            # Zero pad                                                                                
+            jet_df_zero_padded = jet_df.set_index(['jet', particle_indices]).unstack(fill_value=0).stack()
 
-        return jet_array, labels, flavor_array
+            # Group and convert to array
+            jet_list = jet_df_zero_padded.groupby(level=0).apply(lambda x: x.values.tolist()).tolist()                                                                                                               
+            jet_array = np.array(jet_list)
+            print(f'(n_jets, n_particles, n_particle_info) = {jet_array.shape}')
+
+        # For event classification, we stack all the jets in the event together (each jet with zero-padded block of fixed size)
+        elif self.classification_type == 'event':
+
+            # Create empty numpy array, which we will fill with zero-padded jets
+            n_events = labels.size
+            event_size = self.n_jets_max * self.n_particles_per_jet_max
+            n_variables_per_particle = 6
+            jet_array = np.zeros((n_events, event_size, n_variables_per_particle))
+            print(f'(n_jets, n_particles, n_particle_info) = {jet_array.shape}')
+
+            # Drop unnecessary columns
+            jet_df = jet_df.drop(columns=['proc', 'qg', 'ct', 'jetpT'])
+
+            # Group by event
+            event_df_grouped = jet_df.groupby(['event'])
+            
+            # Loop through events and fill the numpy array
+            event_index = 0
+            for _,event_df in event_df_grouped:
+
+                # Group by jet
+                jet_df_grouped = event_df.groupby(['jet'])
+
+                # Fill each jet into the numpy array
+                jet_index = 0
+                for _,jet_df in jet_df_grouped:
+
+                    # Check that number of jets and number of particles are less than our allowed maximum
+                    if jet_index >= self.n_jets_max:
+                        sys.exit(f'ERROR: event {event_index} contains more than n_jets_max={self.n_jets_max} jets')
+                    if len(jet_df.index) > self.n_particles_per_jet_max:
+                        sys.exit(f'ERROR: event {event_index} jet {jet_index} contains more than n_particles_per_jet_max={self.n_particles_per_jet_max} particles')
+
+                    # Convert dataframe to numpy array and add it to the main numpy array
+                    jet_df = jet_df.drop(columns=['event', 'jet'])
+                    jet_array_i = jet_df.to_numpy()
+
+                    particle_index_min = jet_index*self.n_particles_per_jet_max
+                    particle_index_max = particle_index_min + jet_array_i.shape[0]
+                    jet_array[event_index, particle_index_min:particle_index_max, :] = jet_array_i
+
+                    jet_index += 1
+                
+                event_index += 1
+
+        return jet_array, labels, class_array
 
     #---------------------------------------------------------------
     # Compute some individual jet observables
@@ -592,13 +680,14 @@ class AnalyzeFlavor(common_base.CommonBase):
             model_settings = self.model_settings[model]
 
             # EFPs
-            for d in range(1, self.dmax+1):
-                if model == 'efp_linear':
-                    self.fit_efp_linear(model, model_settings, d)
-                if model == 'efp_dnn':
-                    self.fit_efp_dnn(model, model_settings, d)
-            if model == 'efp_lasso':
-                self.fit_efp_lasso(model, model_settings, self.d_lasso)
+            if 'efp' in model:
+                for d in range(1, self.dmax+1):
+                    if model == 'efp_linear':
+                        self.fit_efp_linear(model, model_settings, d)
+                    if model == 'efp_dnn':
+                        self.fit_efp_dnn(model, model_settings, d)
+                if model == 'efp_lasso':
+                    self.fit_efp_lasso(model, model_settings, self.d_lasso)
 
             # Deep sets
             if model == 'pfn':

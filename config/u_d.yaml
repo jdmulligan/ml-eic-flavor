@@ -1,6 +1,7 @@
 # Config file for u vs. d jet classification
 event_type: 'dis'
-flavor_type: 'u__d' # The double underscore specifies the two classes to consider
+classification_type: 'jet'
+classes: 'u__d' # The double underscore specifies the two classes to consider
 
 jet_pt_min_list: [10]    # Can loop over different min jet pt 
 min_particle_pt: 0.
@@ -8,18 +9,18 @@ kappa: [0.3, 0.5, 0.7]
 
 # Input files of training data
 input_files:
- #- /rstorage/ml-eic-flavor/uds/LODIS_flavorjets_1.txt
- - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_1.txt'
- - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_2.txt'
- - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_3.txt'
- - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_4.txt'
- - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_5.txt'
- - '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_6.txt'
+ - /rstorage/ml-eic-flavor/uds/20220818/LODIS_flavorjets_1.txt
+ #- '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_1.txt'
+ #- '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_2.txt'
+ #- '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_3.txt'
+ #- '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_4.txt'
+ #- '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_5.txt'
+ #- '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_6.txt'
 
 # Load labeled data
-n_train: 1000000
-n_val: 200000
-n_test: 200000
+n_train: 1000
+n_val: 200
+n_test: 200
 balance_samples: True
 
 # Select model: pfn, efn, efp_linear, efp_lasso, efp_dnn
@@ -75,7 +76,7 @@ pfn:
     # Network training parameters
     epochs: 10
     batch_size: 500
-    use_pids: False                                  # Use PID information (TODO: needs fixing)
+    use_pids: True
     
 efn:
 

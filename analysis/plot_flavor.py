@@ -58,8 +58,8 @@ class PlotFlavor(common_base.CommonBase):
         self.jet_pt_min_list = config['jet_pt_min_list']
         self.kappa = config['kappa']
 
-        self.flavor_type = config['flavor_type']
-        class_labels = self.flavor_type.split('__')
+        self.classes = config['classes']
+        class_labels = self.classes.split('__')
         self.class1_label = class_labels[0]
         self.class2_label = class_labels[1]
 

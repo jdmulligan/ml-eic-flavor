@@ -1,5 +1,6 @@
 # Config file for ud vs. s jet classification
 event_type: 'dis'
+classification_type: 'jet'
 flavor_type: 'u_d__s' # The double underscore specifies the two classes to consider
 
 jet_pt_min_list: [10]    # Can loop over different min jet pt 
@@ -75,7 +76,7 @@ pfn:
     # Network training parameters
     epochs: 10
     batch_size: 500
-    use_pids: False                                  # Use PID information (TODO: needs fixing)
+    use_pids: True
     
 efn:
 
