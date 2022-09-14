@@ -698,8 +698,11 @@ class AnalyzeFlavor(common_base.CommonBase):
 
         # Plot traditional observables
         for observable in self.qa_observables:
-            self.roc_curve_dict_lasso[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]))
-            self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]))
+            if self.y.size == len(self.qa_results[observable]):
+                self.roc_curve_dict_lasso[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]))
+                self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]))
+            else:
+                print(f'Skip constructing ROC curve for observable={observable}, due to mismatch with number of labels')
 
         # Save ROC curves to file
         if 'nsub_dnn' in self.models or 'efp_dnn' in self.models or 'nsub_linear' in self.models or 'efp_linear' in self.models or 'pfn' in self.models or 'efn' in self.models:
