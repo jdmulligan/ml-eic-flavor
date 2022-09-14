@@ -9,19 +9,28 @@ kappa: [0.3, 0.5, 0.7]
 
 # Input files of training data
 input_files:
- - /rstorage/ml-eic-flavor/uds/20220818/LODIS_flavorjets_1.txt
+ #- /rstorage/ml-eic-flavor/uds/20220912/LODIS_flavorjets_1.txt
  #- '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_1.txt'
- #- '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_2.txt'
- #- '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_3.txt'
- #- '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_4.txt'
- #- '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_5.txt'
- #- '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_6.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_1.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_2.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_3.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_4.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_5.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_6.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_7.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_8.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_9.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_10.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_11.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_12.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_13.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_14.txt'
 
 # Load labeled data
-n_train: 1000
-n_val: 200
-n_test: 200
-balance_samples: True
+n_train: 1000000
+n_val: 200000
+n_test: 200000
+balance_samples: False
 
 # Select model: pfn, efn, efp_linear, efp_lasso, efp_dnn
 models: [pfn]
