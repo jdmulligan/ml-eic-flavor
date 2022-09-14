@@ -406,6 +406,7 @@ class AnalyzeFlavor(common_base.CommonBase):
     def load_training_data(self, jet_pt_min):
 
         for i,input_file in enumerate(self.input_files):
+            print(f'Loading file {i+1}/{len(self.input_files)}...')
 
             jet_df = pd.read_csv(input_file, sep='\s+')
             X_particles, y, class_array = self.create_jet_array(jet_df, jet_pt_min)
@@ -436,7 +437,10 @@ class AnalyzeFlavor(common_base.CommonBase):
             print()
 
             # If enough jets have been found, then return
+            print(f'We have now found {y_total.shape[0]}/{self.n_total} training events.')
             if y_total.shape[0] > self.n_total:
+                print('Done loading!')
+                print()
                 break
 
         # Plot statistics for each class
