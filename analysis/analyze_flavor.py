@@ -439,9 +439,10 @@ class AnalyzeFlavor(common_base.CommonBase):
             # If enough jets have been found, then return
             print(f'We have now found {y_total.shape[0]}/{self.n_total} training events.')
             if y_total.shape[0] > self.n_total:
-                print('Done loading!')
-                print()
                 break
+
+        print('Done loading!')
+        print()
 
         # Plot statistics for each class
         classes, counts = np.unique(class_array_total, return_counts=True)
@@ -624,16 +625,21 @@ class AnalyzeFlavor(common_base.CommonBase):
     # TODO: speed up w/numba
     #---------------------------------------------------------------
     def compute_jet_observables(self):
+        print('Compute jet observables...')
+        print()
 
         self.qa_results = defaultdict(list)
         self.qa_observables = [f'jet_charge_k{kappa}' for kappa in self.kappa]
         self.qa_observables += [f'jet_charge0_k{kappa}_multiplicity' for kappa in self.kappa]
         self.qa_observables += ['particle_multiplicity']
+        self.qa_observables += ['strange_tagger']
 
         # Compute jet charge
+        print('  Computing jet charge...')
         for kappa in self.kappa:
 
-            for jet in self.X_particles:
+            charge0_jets_with_charged_constituents = {}
+            for i,jet in enumerate(self.X_particles):
 
                 jet_charge = 0
                 jet_pt = 0
@@ -652,21 +658,46 @@ class AnalyzeFlavor(common_base.CommonBase):
                     self.qa_results[f'jet_charge0_k{kappa}_multiplicity'].append(pid_nonzero.size)
 
                     # Check that the jet contains no charged particles
-                    # Particles expected for c*tau > 1cm: (Omega-, Lambda0)
-                    #     and antiparticles for (Omega-, Lambda0)
                     neutral_pids = np.array([22, 130, 310, 2112, 3322, 3122,
                                              -2112, -3322, -3122])
                     charged_pids = np.array([11, 13, 211, 321, 2212, 3222, 3112, 3312, 3334
                                              -11, -13, -211, -321, -2212, -3222, -3112, -3312, -3334])
                     if np.any(np.in1d(pid_nonzero, charged_pids)):
-                        print(pid_nonzero)
-                        sys.exit(f'A jet with charge=0 has charged constituents!')
+                        charge0_jets_with_charged_constituents[i] = jet
+                        print(f'WARNING: unexpected jet charge={jet_charge}')
+                        print(f'pid: {jet[:,4][ jet[:,4] != 0]}')
+                        print(f'pid: {jet[:pid_nonzero.size,4]}')
+                        print(f'charge: {jet[:pid_nonzero.size,5]}')
+                        print(f'pt: {jet[:,0][ jet[:,0] != 0]}')
+                        print(f'eta: {jet[:,1][ jet[:,1] != 0]}')
+                        print(f'phi: {jet[:,2][ jet[:,2] != 0]}')
+                        print()
 
-        # Compute particle multiplicity
+            if charge0_jets_with_charged_constituents:        
+                print(f'WARNING: {len(charge0_jets_with_charged_constituents.keys())} jets with charge=0 (kappa={kappa}) have charged constituents!')
+                print()
+
+        print('  Done.')
+        print()
+
+        # Compute some other jet observables
+        print('  Computing additional observables...')
         for jet in self.X_particles:
+
             pid = jet[:,4]
             pid_nonzero = pid[ pid != 0]
+
+            # Compute particle multiplicity
             self.qa_results[f'particle_multiplicity'].append(pid_nonzero.size)
+
+            # Compute whether jet has a strange hadron in it
+            strange_particle_pdg = [321, 130, 310, 3222, 3112, 3312, 3322, 3334, 3122, 
+                                    -321, -3222, -3112, -3312, -3322, -3334, -3122]
+            found_strange_hadron = np.any(np.in1d(pid_nonzero, strange_particle_pdg))
+            self.qa_results[f'strange_tagger'].append(found_strange_hadron)
+
+            print('  Done.')
+        print('Done.')
 
     #---------------------------------------------------------------
     # Train models
@@ -703,8 +734,8 @@ class AnalyzeFlavor(common_base.CommonBase):
         # Plot traditional observables
         for observable in self.qa_observables:
             if self.y.size == len(self.qa_results[observable]):
-                self.roc_curve_dict_lasso[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]))
-                self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]))
+                self.roc_curve_dict_lasso[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]).astype(np.float))
+                self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]).astype(np.float))
             else:
                 print(f'Skip constructing ROC curve for observable={observable}, due to mismatch with number of labels')
 
