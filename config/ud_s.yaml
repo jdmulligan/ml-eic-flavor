@@ -1,7 +1,7 @@
 # Config file for ud vs. s jet classification
 event_type: 'dis'
 classification_type: 'jet'
-flavor_type: 'u_d__s' # The double underscore specifies the two classes to consider
+classes: 'u_d__s' # The double underscore specifies the two classes to consider
 
 jet_pt_min_list: [10]    # Can loop over different min jet pt 
 min_particle_pt: 0.
@@ -27,9 +27,9 @@ input_files:
  - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_14.txt'
 
 # Load labeled data
-n_train: 1000000
-n_val: 200000
-n_test: 200000
+n_train: 10000000
+n_val: 2000000
+n_test: 2000000
 balance_samples: False
 
 # Select model: pfn, efn, efp_linear, efp_lasso, efp_dnn
@@ -85,7 +85,7 @@ pfn:
     # Network training parameters
     epochs: 10
     batch_size: 500
-    use_pids: True
+    use_pids: False
     
 efn:
 

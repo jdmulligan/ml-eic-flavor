@@ -637,6 +637,7 @@ class AnalyzeFlavor(common_base.CommonBase):
         # Compute jet charge
         print('  Computing jet charge...')
         for kappa in self.kappa:
+            print(f'    kappa={kappa}...')
 
             charge0_jets_with_charged_constituents = {}
             for i,jet in enumerate(self.X_particles):
@@ -696,7 +697,6 @@ class AnalyzeFlavor(common_base.CommonBase):
             found_strange_hadron = np.any(np.in1d(pid_nonzero, strange_particle_pdg))
             self.qa_results[f'strange_tagger'].append(found_strange_hadron)
 
-            print('  Done.')
         print('Done.')
 
     #---------------------------------------------------------------
