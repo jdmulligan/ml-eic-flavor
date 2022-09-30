@@ -50,7 +50,7 @@ from base import common_base
 def filter_four_vectors(X_particles, min_pt=0.):
 
     n_jets = X_particles.shape[0]
-    n_particles = 800
+    n_particles = X_particles.shape[1]
     
     for i in prange(n_jets):
         jet = X_particles[i]
@@ -162,9 +162,9 @@ class AnalyzeFlavor(common_base.CommonBase):
             self.n_particles_per_jet_max = config['n_particles_per_jet_max']
 
         self.jet_pt_min_list= config['jet_pt_min_list']
-        self.min_particle_pt = config['min_particle_pt']
         self.jetR = 0.4
         self.kappa = config['kappa']
+        self.particle_pt_min_list = config['particle_pt_min_list']
 
         self.input_files = config['input_files']
 
@@ -226,7 +226,9 @@ class AnalyzeFlavor(common_base.CommonBase):
                 self.model_settings[model]['F_sizes'] = tuple(config[model]['F_sizes'])
                 self.model_settings[model]['epochs'] = config[model]['epochs']
                 self.model_settings[model]['batch_size'] = config[model]['batch_size']
-                self.model_settings[model]['use_pids'] = config[model]['use_pids']
+                self.model_settings[model]['pid'] = config[model]['pid']
+                self.model_settings[model]['nopid'] = config[model]['nopid']
+                self.model_settings[model]['charge'] = config[model]['charge']
                 
             if model == 'efn':
                 self.model_settings[model]['Phi_sizes'] = tuple(config[model]['Phi_sizes'])
@@ -250,7 +252,7 @@ class AnalyzeFlavor(common_base.CommonBase):
         
             # Clear variables
             self.y = None
-            self.X_particles = None
+            self.X_particles = {}
 
             # Create output dir
             self.output_dir_i = os.path.join(self.output_dir, f'pt{jet_pt_min}')
@@ -301,9 +303,14 @@ class AnalyzeFlavor(common_base.CommonBase):
 
             # Truncate the input arrays to the requested size
             self.y = y_shuffled[:self.n_total]
-            self.X_particles = X_particles_shuffled[:self.n_total]
+            self.X_particles_unfiltered = X_particles_shuffled[:self.n_total]
             print(f'y_shuffled sum: {np.sum(self.y)}')
             print(f'y_shuffled shape: {self.y.shape}')
+
+            # Create additional sets of four-vectors in which a min-pt cut is applied -- the labels can stay the same
+            if 'pfn' in self.models:
+                for particle_pt_min in self.particle_pt_min_list:
+                    self.X_particles[f'particle_pt_min{particle_pt_min}'] = filter_four_vectors(np.copy(self.X_particles_unfiltered), min_pt=particle_pt_min)
 
             # Also compute some jet observables
             self.compute_jet_observables()
@@ -332,7 +339,7 @@ class AnalyzeFlavor(common_base.CommonBase):
                 # Load labels and data, four vectors. Format: (pT,y,phi,m). 
                 # Note: no PID yet which would be 5th entry... check later!
                 # To make sure, don't need any further preprocessing like for EFNs?
-                X_EFP = self.X_particles[:,:,:4] # Remove pid,charge from self.X_particles
+                X_EFP = self.X_particles['particle_pt_min0'][:,:,:4] # Remove pid,charge from self.X_particles
                 Y_EFP = self.y #Note not "to_categorical" here... 
     
                 # Switch here to Jesse's quark/gluon data set.
@@ -634,68 +641,73 @@ class AnalyzeFlavor(common_base.CommonBase):
         self.qa_observables += ['particle_multiplicity']
         self.qa_observables += ['strange_tagger']
 
-        # Compute jet charge
+        # Compute jet charge for each jet collection
         print('  Computing jet charge...')
-        for kappa in self.kappa:
-            print(f'    kappa={kappa}...')
+        for particle_pt_min in self.particle_pt_min_list:
+            print(f'    for jets with particle_pt_min={particle_pt_min}')
+            for kappa in self.kappa:
+                print(f'      kappa={kappa}...')
 
-            charge0_jets_with_charged_constituents = {}
-            for i,jet in enumerate(self.X_particles):
+                charge0_jets_with_charged_constituents = {}
 
-                jet_charge = 0
-                jet_pt = 0
-                for particle in jet:
-                    pt = particle[0]
-                    charge = particle[5]
-                    jet_pt += pt
-                    jet_charge += charge * np.power(pt, kappa)
-                jet_charge = jet_charge / np.power(jet_pt, kappa)
-                self.qa_results[f'jet_charge_k{kappa}'].append(jet_charge)
+                for i,jet in enumerate(self.X_particles[f'particle_pt_min{particle_pt_min}']):
 
-                # Check properties of charge=0 jets
-                if np.isclose(jet_charge, 0.):
-                    pid = jet[:,4]
-                    pid_nonzero = pid[ pid != 0]
-                    self.qa_results[f'jet_charge0_k{kappa}_multiplicity'].append(pid_nonzero.size)
+                    jet_charge = 0
+                    jet_pt = 0
+                    for particle in jet:
+                        pt = particle[0]
+                        charge = particle[5]
+                        jet_pt += pt
+                        jet_charge += charge * np.power(pt, kappa)
+                    jet_charge = jet_charge / np.power(jet_pt, kappa)
+                    self.qa_results[f'jet_charge_ptmin{particle_pt_min}_k{kappa}'].append(jet_charge)
 
-                    # Check that the jet contains no charged particles
-                    neutral_pids = np.array([22, 130, 310, 2112, 3322, 3122,
-                                             -2112, -3322, -3122])
-                    charged_pids = np.array([11, 13, 211, 321, 2212, 3222, 3112, 3312, 3334
-                                             -11, -13, -211, -321, -2212, -3222, -3112, -3312, -3334])
-                    if np.any(np.in1d(pid_nonzero, charged_pids)):
-                        charge0_jets_with_charged_constituents[i] = jet
-                        print(f'WARNING: unexpected jet charge={jet_charge}')
-                        print(f'pid: {jet[:,4][ jet[:,4] != 0]}')
-                        print(f'pid: {jet[:pid_nonzero.size,4]}')
-                        print(f'charge: {jet[:pid_nonzero.size,5]}')
-                        print(f'pt: {jet[:,0][ jet[:,0] != 0]}')
-                        print(f'eta: {jet[:,1][ jet[:,1] != 0]}')
-                        print(f'phi: {jet[:,2][ jet[:,2] != 0]}')
-                        print()
+                    # Check properties of charge=0 jets
+                    if np.isclose(jet_charge, 0.):
+                        pid = jet[:,4]
+                        pid_nonzero = pid[ pid != 0]
+                        self.qa_results[f'jet_charge0_ptmin{particle_pt_min}_k{kappa}_multiplicity'].append(pid_nonzero.size)
 
-            if charge0_jets_with_charged_constituents:        
-                print(f'WARNING: {len(charge0_jets_with_charged_constituents.keys())} jets with charge=0 (kappa={kappa}) have charged constituents!')
-                print()
+                        # Check that the jet contains no charged particles
+                        neutral_pids = np.array([22, 130, 310, 2112, 3322, 3122,
+                                                -2112, -3322, -3122])
+                        charged_pids = np.array([11, 13, 211, 321, 2212, 3222, 3112, 3312, 3334
+                                                -11, -13, -211, -321, -2212, -3222, -3112, -3312, -3334])
+                        if np.any(np.in1d(pid_nonzero, charged_pids)):
+                            charge0_jets_with_charged_constituents[i] = jet
+                            print(f'WARNING: unexpected jet charge={jet_charge}')
+                            print(f'pid: {jet[:,4][ jet[:,4] != 0]}')
+                            print(f'pid: {jet[:pid_nonzero.size,4]}')
+                            print(f'charge: {jet[:pid_nonzero.size,5]}')
+                            print(f'pt: {jet[:,0][ jet[:,0] != 0]}')
+                            print(f'eta: {jet[:,1][ jet[:,1] != 0]}')
+                            print(f'phi: {jet[:,2][ jet[:,2] != 0]}')
+                            print()
+
+                if charge0_jets_with_charged_constituents:        
+                    print(f'WARNING: {len(charge0_jets_with_charged_constituents.keys())} jets with charge=0 (kappa={kappa}) have charged constituents!')
+                    print()
 
         print('  Done.')
         print()
 
         # Compute some other jet observables
         print('  Computing additional observables...')
-        for jet in self.X_particles:
+        for particle_pt_min in self.particle_pt_min_list:
+            print(f'    for jets with particle_pt_min={particle_pt_min}')
+            for jet in self.X_particles[f'particle_pt_min{particle_pt_min}']:
 
-            pid = jet[:,4]
-            pid_nonzero = pid[ pid != 0]
+                pid = jet[:,4]
+                pid_nonzero = pid[ pid != 0]
 
-            # Compute particle multiplicity
-            self.qa_results[f'particle_multiplicity'].append(pid_nonzero.size)
+                # Compute particle multiplicity
+                self.qa_results[f'particle_multiplicity_ptmin{particle_pt_min}'].append(pid_nonzero.size)
 
-            # Compute whether jet has a strange hadron in it
-            strange_particle_pdg = [321, 130, 310, 3222, 3112, 3312, 3322, 3334, 3122, 
-                                    -321, -3222, -3112, -3312, -3322, -3334, -3122]
-            found_strange_hadron = np.any(np.in1d(pid_nonzero, strange_particle_pdg))
-            self.qa_results[f'strange_tagger'].append(found_strange_hadron)
+                # Compute whether jet has a strange hadron in it
+                strange_particle_pdg = [321, 130, 310, 3222, 3112, 3312, 3322, 3334, 3122, 
+                                        -321, -3222, -3112, -3312, -3322, -3334, -3122]
+                found_strange_hadron = np.any(np.in1d(pid_nonzero, strange_particle_pdg))
+                self.qa_results[f'strange_tagger_ptmin{particle_pt_min}'].append(found_strange_hadron)
 
         print('Done.')
 
@@ -726,7 +738,20 @@ class AnalyzeFlavor(common_base.CommonBase):
 
             # Deep sets
             if model == 'pfn':
-                self.fit_pfn(model, model_settings, self.y, self.X_particles)
+
+                for particle_pt_min in self.particle_pt_min_list:
+
+                    if model_settings['pid']:
+                        model_label = f'pfn_pid_minpt{particle_pt_min}'
+                        self.fit_pfn(model_label, model_settings, self.y, self.X_particles[f'particle_pt_min{particle_pt_min}'], pid=True)
+
+                    if model_settings['nopid']:
+                        model_label = f'pfn_nopid_minpt{particle_pt_min}'
+                        self.fit_pfn(model_label, model_settings, self.y, self.X_particles[f'particle_pt_min{particle_pt_min}'], pid=False, charge=False)
+
+                    if model_settings['charge']:
+                        model_label = f'pfn_charge_minpt{particle_pt_min}'
+                        self.fit_pfn(model_label, model_settings, self.y, self.X_particles[f'particle_pt_min{particle_pt_min}'], pid=False, charge=True)
                 
             if model == 'efn':
                 self.fit_efn(model, model_settings)
@@ -1123,8 +1148,11 @@ class AnalyzeFlavor(common_base.CommonBase):
         # Convert labels to categorical
         Y_PFN = energyflow.utils.to_categorical(y, num_classes=2)
                         
-        # (pT,y,phi,pid)
-        X_PFN = X_particles[:,:,[0,1,2,4]]
+        # (pT,y,phi,pid/charge)
+        if model_settings['use_charge']:
+            X_PFN = X_particles[:,:,[0,1,2,5]]
+        else:
+            X_PFN = X_particles[:,:,[0,1,2,4]]
 
         # Preprocess by centering jets and normalizing pts
         for x_PFN in X_PFN:
@@ -1181,7 +1209,7 @@ class AnalyzeFlavor(common_base.CommonBase):
         Y_EFN = energyflow.utils.to_categorical(self.y, num_classes=2)
                         
         # (pT,y,phi,m)
-        X_EFN = self.X_particles[:,:,:4] # Remove pid,charge from self.X_particles
+        X_EFN = self.X_particles['particle_pt_min0'][:,:,:4] # Remove pid,charge from self.X_particles
         
         # Can switch here to quark vs gluon data set
         #X_EFN, y_EFN = energyflow.datasets.qg_jets.load(self.n_train + self.n_val + self.n_test)

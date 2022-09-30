@@ -4,8 +4,10 @@ classification_type: 'jet'
 classes: 'u_d__s' # The double underscore specifies the two classes to consider
 
 jet_pt_min_list: [10]    # Can loop over different min jet pt 
-min_particle_pt: 0.
 kappa: [0.3, 0.5, 0.7]
+
+# Train multiple models with different particle min pt (in GeV) (only implemented for PFNs and single jet observables)
+particle_pt_min_list: [0, 0.2, 0.4]
 
 # Input files of training data
 input_files:
@@ -85,7 +87,11 @@ pfn:
     # Network training parameters
     epochs: 10
     batch_size: 500
-    use_pids: False
+
+    # Train PFNs for each of the following options
+    pid: True
+    nopid: True      
+    charge: True
     
 efn:
 
