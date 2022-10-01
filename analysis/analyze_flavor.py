@@ -636,10 +636,11 @@ class AnalyzeFlavor(common_base.CommonBase):
         print()
 
         self.qa_results = defaultdict(list)
-        self.qa_observables = [f'jet_charge_k{kappa}' for kappa in self.kappa]
-        self.qa_observables += [f'jet_charge0_k{kappa}_multiplicity' for kappa in self.kappa]
-        self.qa_observables += ['particle_multiplicity']
-        self.qa_observables += ['strange_tagger']
+        for particle_pt_min in self.particle_pt_min_list:
+            self.qa_observables = [f'jet_charge_ptmin{particle_pt_min}_k{kappa}' for kappa in self.kappa]
+            self.qa_observables += [f'jet_charge0_ptmin{particle_pt_min}_k{kappa}_multiplicity' for kappa in self.kappa]
+            self.qa_observables += [f'particle_multiplicity_ptmin{particle_pt_min}']
+            self.qa_observables += [f'strange_tagger_ptmin{particle_pt_min}']
 
         # Compute jet charge for each jet collection
         print('  Computing jet charge...')
@@ -1143,13 +1144,13 @@ class AnalyzeFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     # Fit ML model -- Deep Set/Particle Flow Networks
     #---------------------------------------------------------------
-    def fit_pfn(self, model, model_settings, y, X_particles):
+    def fit_pfn(self, model, model_settings, y, X_particles, pid=False, charge=False):
     
         # Convert labels to categorical
         Y_PFN = energyflow.utils.to_categorical(y, num_classes=2)
                         
         # (pT,y,phi,pid/charge)
-        if model_settings['use_charge']:
+        if charge:
             X_PFN = X_particles[:,:,[0,1,2,5]]
         else:
             X_PFN = X_particles[:,:,[0,1,2,4]]
@@ -1162,7 +1163,7 @@ class AnalyzeFlavor(common_base.CommonBase):
             x_PFN[mask,0] /= x_PFN[:,0].sum()
         
         # Handle particle id channel
-        if model_settings['use_pids']:
+        if pid:
             self.my_remap_pids(X_PFN)
         else:
             X_PFN = X_PFN[:,:,:3]
