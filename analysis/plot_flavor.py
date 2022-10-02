@@ -120,7 +120,6 @@ class PlotFlavor(common_base.CommonBase):
                 strange_tagger_label = f'strange_tagger_ptmin{particle_pt_min}'
                 roc_list[strange_tagger_label] = self.roc_curve_dict[strange_tagger_label]
 
-            print('plot')
             self.plot_roc_curves(roc_list, jet_pt_min, type=type)
 
         # Plot all particle_pt_min for either pid/charge/nopid
@@ -136,7 +135,6 @@ class PlotFlavor(common_base.CommonBase):
                 if model in self.roc_curve_dict.keys():
                     roc_list[model] = self.roc_curve_dict[model]
 
-            print('plot2')
             self.plot_roc_curves(roc_list, jet_pt_min, type=type)
 
     #--------------------------------------------------------------- 
@@ -171,7 +169,6 @@ class PlotFlavor(common_base.CommonBase):
         plt.grid(True)
     
         for label,value in roc_list.items():
-            print(label)
             index=0
             if 'pfn' in label:
                 linewidth = 4
@@ -181,14 +178,15 @@ class PlotFlavor(common_base.CommonBase):
                 color=self.color(label, particle_pt_min=minpt, type=type)
                 linestyle = self.linestyle(label)
 
-                label = 'Particle Flow Network'
                 if type == 'fixed_ptmin':
                     if 'charge' in label:
-                        label += ' (w/ charge)'
+                        label = 'Particle Flow Network (w/ charge)'
                     elif 'nopid' in label:
-                        label += ' (w/o PID)'
+                        label = 'Particle Flow Network (w/o PID)'
                     elif 'pid' in label:
-                        label += ' (w/ PID)' 
+                        label = 'Particle Flow Network (w/ PID)' 
+                else:
+                    label = 'Particle Flow Network'
 
             elif 'jet_charge' in label:
                 linewidth = 4
