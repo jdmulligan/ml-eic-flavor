@@ -44,7 +44,7 @@ class PlotFlavor(common_base.CommonBase):
         self.significance_plot_index = 0
         self.auc_plot_index = 0
 
-        self.plot_title = False
+        self.plot_title = True
                 
     #---------------------------------------------------------------
     # Initialize config file into class members
@@ -63,15 +63,10 @@ class PlotFlavor(common_base.CommonBase):
         self.class1_label = class_labels[0]
         self.class2_label = class_labels[1]
 
-        self.models = config['models']
-        self.dmax = config['dmax']
-        self.efp_measure = config['efp_measure']
-        self.efp_beta = config['efp_beta']
-        
-        # Initialize model-specific settings
-        self.efp_alpha_list = config['efp_lasso']['alpha']
-        self.d_lasso_efp = config['efp_lasso']['d_lasso']
+        self.particle_pt_min_list = config['particle_pt_min_list']
 
+        self.models = config['models']
+        
     #---------------------------------------------------------------
     # Main processing function
     #---------------------------------------------------------------
@@ -95,13 +90,6 @@ class PlotFlavor(common_base.CommonBase):
                 self.roc_curve_dict = pickle.load(f)
                 self.AUC = pickle.load(f)
 
-            lasso_filename = os.path.join(self.output_dir_i, f'ROC{self.key_suffix}_lasso.pkl')
-            if os.path.exists(lasso_filename):
-                with open(lasso_filename, 'rb') as f_lasso:
-                    self.roc_curve_dict_lasso = pickle.load(f_lasso)
-                    self.N_terms_lasso = pickle.load(f_lasso)
-                    self.observable_lasso = pickle.load(f_lasso)
-
             # Plot models for a single setting
             self.plot_models(jet_pt_min)
 
@@ -110,102 +98,138 @@ class PlotFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     def plot_models(self, jet_pt_min):
 
-        if 'pfn' in self.models:
+        # Plot pid vs. charge vs. nopid for each particle_pt_min
+        type = 'fixed_ptmin'
+        for particle_pt_min in self.particle_pt_min_list:
+
+            pfn_charge_label = f'pfn_charge_minpt{particle_pt_min}'
+            pfn_pid_label = f'pfn_pid_minpt{particle_pt_min}'
+            pfn_nopid_label = f'pfn_nopid_minpt{particle_pt_min}'
+            models = [pfn_charge_label, pfn_pid_label, pfn_nopid_label]
+
             roc_list = {}
-            roc_list['PFN'] = self.roc_curve_dict['pfn']
+            for model in models:
+                if model in list(self.roc_curve_dict.keys()):
+                    roc_list[model] = self.roc_curve_dict[model]
+
             for kappa in self.kappa:
-                roc_list[f'jet_charge_k{kappa}'] = self.roc_curve_dict[f'jet_charge_k{kappa}']
-            self.plot_roc_curves(roc_list, jet_pt_min)
+                charge_label = f'jet_charge_ptmin{particle_pt_min}_k{kappa}'
+                roc_list[charge_label] = self.roc_curve_dict[charge_label]
 
-        if 'pfn' in self.models and 'efn' in self.models:
+            if self.class2_label == 's':
+                strange_tagger_label = f'strange_tagger_ptmin{particle_pt_min}'
+                roc_list[strange_tagger_label] = self.roc_curve_dict[strange_tagger_label]
+
+            print('plot')
+            self.plot_roc_curves(roc_list, jet_pt_min, type=type)
+
+        # Plot all particle_pt_min for either pid/charge/nopid
+        type='varied_ptmin'
+        pfn_labels = ['charge', 'pid', 'nopid']
+        for pfn_label in pfn_labels:
+
             roc_list = {}
-            roc_list['PFN'] = self.roc_curve_dict['pfn']
-            roc_list['EFN'] = self.roc_curve_dict['efn']
-            self.plot_roc_curves(roc_list, jet_pt_min)
 
-        if 'efp_linear' in self.models:
-             roc_list = {}
-             for d in range(3, self.dmax+1):
-                 roc_list[f'EFP (d = {d}), Linear'] = self.roc_curve_dict['efp_linear'][d]
-             for kappa in self.kappa:
-                 roc_list[f'jet_charge_k{kappa}'] = self.roc_curve_dict[f'jet_charge_k{kappa}']
-             self.plot_roc_curves(roc_list, jet_pt_min)
+            for particle_pt_min in self.particle_pt_min_list:
 
-        if 'efp_dnn' in self.models:
-             roc_list = {}
-             for d in range(3, self.dmax+1):
-                 roc_list[f'EFP (d = {d}), DNN'] = self.roc_curve_dict['efp_dnn'][d]
-             self.plot_roc_curves(roc_list, jet_pt_min)
+                model = f'pfn_{pfn_label}_minpt{particle_pt_min}'
+                if model in self.roc_curve_dict.keys():
+                    roc_list[model] = self.roc_curve_dict[model]
 
-        if 'efp_linear' in self.models and 'efp_lasso' in self.models:
-            roc_list = {}
-            roc_list[f'EFP (d = {self.d_lasso_efp}), Linear'] = self.roc_curve_dict['efp_linear'][self.d_lasso_efp]
-            for alpha in self.efp_alpha_list:
-                roc_list[rf'Lasso $(\alpha = {alpha})$, EFP'] = self.roc_curve_dict_lasso['efp_lasso'][alpha]
-            for kappa in self.kappa:
-                roc_list[f'jet_charge_k{kappa}'] = self.roc_curve_dict[f'jet_charge_k{kappa}']
-            self.plot_roc_curves(roc_list, jet_pt_min)
+            print('plot2')
+            self.plot_roc_curves(roc_list, jet_pt_min, type=type)
 
     #--------------------------------------------------------------- 
     # Plot ROC curves
     #--------------------------------------------------------------- 
-    def plot_roc_curves(self, roc_list, jet_pt_min):
+    def plot_roc_curves(self, roc_list, jet_pt_min, type=''):
     
         plt.plot([0, 1], [0, 1], 'k--') # dashed diagonal
         plt.axis([0, 1, 0, 1])
-        plt.title(f'{self.class1_label} vs. {self.class2_label}     ' + rf'$p_{{\mathrm{{T,jet}}}}>{jet_pt_min}\;\mathrm{{GeV}}$', fontsize=14)
+
+        title = f'{self.class1_label} vs. {self.class2_label}     ' + rf'$p_{{\mathrm{{T,jet}}}}>{jet_pt_min}\;\mathrm{{GeV}}$'
+        if type == 'fixed_ptmin':
+            for label,value in roc_list.items():
+                if 'pfn' in label:
+                    minpt = label.rsplit('_')[2][5:]
+            title += f'      minpt={minpt}'
+        if type == 'varied_ptmin':
+            for label,value in roc_list.items():
+                if 'pfn' in label:
+                    if 'charge' in label:
+                        title_label = '      w/charge'
+                    elif 'nopid' in label:
+                        title_label = '      w/o PID'
+                    elif 'pid' in label:
+                        title_label = '      w/PID'
+            title += title_label
         if self.plot_title:
-            plt.title(rf'$p_T min = {jet_pt_min}$', fontsize=14)
+            plt.title(title, fontsize=14)
+
         plt.xlabel(f'False {self.class1_label} Rate', fontsize=16)
         plt.ylabel(f'True {self.class1_label} Rate', fontsize=16)
         plt.grid(True)
     
         for label,value in roc_list.items():
+            print(label)
             index=0
-            if label in ['PFN', 'EFN', 'pfn'] or 'jet_charge' in label:
+            if 'pfn' in label:
                 linewidth = 4
                 alpha = 0.5
-                linestyle = self.linestyle(label)
-                color=self.color(label)
-                legend_fontsize = 12
-                if 'jet_charge' in label:
-                    label = label
-                    linewidth = 2
-                    alpha = 0.6
-                if label == 'PFN':
-                    label = 'Particle Flow Network'
-                if label == 'EFN':
-                    label = 'Energy Flow Network'
-            elif 'Lasso' in label:
-                linewidth = 2
-                alpha = 1
-                linestyle = 'solid'
-                color=self.color(label)
-                legend_fontsize = 10
-                reg_param = float(re.search('= (.*)\)', label).group(1))
-                if 'EFP' in label:
-                    n_terms = self.N_terms_lasso['efp_lasso'][reg_param]
-                    label = rf'$\sum_{{G}} c_{{G}} \rm{{EFP}}_{{G}}$'
-                label += f', {n_terms} terms'
 
-            elif 'DNN' in label or 'EFP' in label:
+                minpt = label.rsplit('_')[2][5:]
+                color=self.color(label, particle_pt_min=minpt, type=type)
+                linestyle = self.linestyle(label)
+
+                label = 'Particle Flow Network'
+                if type == 'fixed_ptmin':
+                    if 'charge' in label:
+                        label += ' (w/ charge)'
+                    elif 'nopid' in label:
+                        label += ' (w/o PID)'
+                    elif 'pid' in label:
+                        label += ' (w/ PID)' 
+
+            elif 'jet_charge' in label:
+                linewidth = 4
+                alpha = 0.5
+                label = label
                 linewidth = 2
-                alpha = 0.9
-                linestyle = 'solid'
-                color=self.color(label)
-                legend_fontsize = 12
+                alpha = 0.6
+
+                minpt = label.rsplit('_')[2][4:]
+                kappa = label.rsplit('_')[3][1:]
+                color=self.color(label, particle_pt_min=minpt, kappa=kappa, type=type)
+                linestyle = self.linestyle(label)
+
+                label = rf'Jet charge, $\kappa={kappa}$'
+
+            elif 'strange_tagger' in label:
+                linewidth = 4
+                alpha = 0.5
+                label = label
+                linewidth = 2
+                alpha = 0.6
+
+                minpt = label.rsplit('_')[2][4:]
+                color=self.color(label, particle_pt_min=minpt, type=type)
+                linestyle = self.linestyle(label)
+
             else:
                 linewidth = 2
                 linestyle = 'solid'
                 alpha = 0.9
                 color = sns.xkcd_rgb['almost black']
-                legend_fontsize = 12
   
+            if type == 'varied_ptmin':
+                label += f', min_pt = {minpt}'
+
             FPR = value[0]
             TPR = value[1]
             plt.plot(FPR, TPR, linewidth=linewidth, label=label,
                      linestyle=linestyle, alpha=alpha, color=color)
                     
+        legend_fontsize = 10
         plt.legend(loc='lower right', fontsize=legend_fontsize)
 
         plt.tight_layout()
@@ -217,27 +241,41 @@ class PlotFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     # Get color for a given label
     #---------------------------------------------------------------
-    def color(self, label):
+    def color(self, label, particle_pt_min=None, kappa=None, type=type):
 
         color = None
-        if label in ['PFN', 'PFN_hard', 'EFP (d = 7), Linear', 'EFP (d = 7), DNN']:
-            color = sns.xkcd_rgb['faded purple'] 
-        elif label in ['EFN', 'EFN_hard', 'jet_charge_k0']:
-            color = sns.xkcd_rgb['faded red']    
-        elif label in ['EFP (d = 6), Linear', 'EFP (d = 6), DNN']:
-            color = sns.xkcd_rgb['dark sky blue']    
-        elif label in ['jet_charge_k0']:
-            color = sns.xkcd_rgb['light lavendar']    
-        elif label in ['EFN_background', 'EFP (d = 5), Linear', 'EFP (d = 5), DNN']:
-            color = sns.xkcd_rgb['medium green']  
-        elif label in ['EFP (d = 3), Linear', 'EFP (d = 3), DNN', rf'Lasso $(\alpha = {self.efp_alpha_list[1]})$, EFP']:
-            color = sns.xkcd_rgb['watermelon'] 
-        elif label in ['EFP (d = 4), Linear', 'EFP (d = 4), DNN', rf'Lasso $(\alpha = {self.efp_alpha_list[0]})$, EFP']:
-            color = sns.xkcd_rgb['light brown'] 
-        elif label in ['jet_charge_k0.3']:
-            color = sns.xkcd_rgb['medium brown']
-        else:
-            color = sns.xkcd_rgb['almost black']
+
+        if type == 'fixed_ptmin':
+
+            if 'pfn_charge' in label:
+                color = sns.xkcd_rgb['faded purple'] 
+            elif 'pfn_pid' in label:
+                color = sns.xkcd_rgb['faded red']    
+            elif 'pfn_nopid' in label:
+                color = sns.xkcd_rgb['dark sky blue']
+            elif 'strange_tagger' in label:
+                color = sns.xkcd_rgb['medium green']  
+            elif 'jet_charge' in label:
+                if kappa == '0.3':
+                    color = sns.xkcd_rgb['watermelon'] 
+                if kappa == '0.5':
+                    color = sns.xkcd_rgb['light brown'] 
+                if kappa == '0.7':
+                    color = sns.xkcd_rgb['medium brown']
+            else:
+                color = sns.xkcd_rgb['almost black']
+                #color = sns.xkcd_rgb['light lavendar']  
+
+        elif type == 'varied_ptmin':
+
+            if particle_pt_min == '0':
+                color = sns.xkcd_rgb['faded purple'] 
+            elif particle_pt_min == '0.2':
+                color = sns.xkcd_rgb['faded red']    
+            elif particle_pt_min == '0.4':
+                color = sns.xkcd_rgb['dark sky blue']
+            else:
+                color = sns.xkcd_rgb['almost black']
 
         return color
 
@@ -247,9 +285,7 @@ class PlotFlavor(common_base.CommonBase):
     def linestyle(self, label):
  
         linestyle = None
-        if 'PFN' in label and 'min_pt' in label:
-            linestyle = 'dotted'
-        elif 'PFN' in label or 'EFN' in label or 'DNN' in label or 'pfn' in label:
+        if 'pfn' in label:
             linestyle = 'solid'
         else:
             linestyle = 'dotted'
