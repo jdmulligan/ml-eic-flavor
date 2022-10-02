@@ -636,8 +636,9 @@ class AnalyzeFlavor(common_base.CommonBase):
         print()
 
         self.qa_results = defaultdict(list)
+        self.qa_observables = []
         for particle_pt_min in self.particle_pt_min_list:
-            self.qa_observables = [f'jet_charge_ptmin{particle_pt_min}_k{kappa}' for kappa in self.kappa]
+            self.qa_observables += [f'jet_charge_ptmin{particle_pt_min}_k{kappa}' for kappa in self.kappa]
             self.qa_observables += [f'jet_charge0_ptmin{particle_pt_min}_k{kappa}_multiplicity' for kappa in self.kappa]
             self.qa_observables += [f'particle_multiplicity_ptmin{particle_pt_min}']
             self.qa_observables += [f'strange_tagger_ptmin{particle_pt_min}']
