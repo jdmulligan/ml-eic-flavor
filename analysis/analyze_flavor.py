@@ -1170,7 +1170,8 @@ class AnalyzeFlavor(common_base.CommonBase):
         if pid:
             self.my_remap_pids(X_PFN)
         else:
-            X_PFN = X_PFN[:,:,:3]
+            if not charge:
+                X_PFN = X_PFN[:,:,:3]
         
         # Check shape
         if y.shape[0] != X_PFN.shape[0]:
