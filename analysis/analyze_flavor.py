@@ -744,14 +744,17 @@ class AnalyzeFlavor(common_base.CommonBase):
 
                     if model_settings['pid']:
                         model_label = f'pfn_pid_minpt{particle_pt_min}'
+                        self.AUC[f'{model_label}{self.key_suffix}'] = []
                         self.fit_pfn(model_label, model_settings, self.y, self.X_particles[f'particle_pt_min{particle_pt_min}'], pid=True)
 
                     if model_settings['nopid']:
                         model_label = f'pfn_nopid_minpt{particle_pt_min}'
+                        self.AUC[f'{model_label}{self.key_suffix}'] = []
                         self.fit_pfn(model_label, model_settings, self.y, self.X_particles[f'particle_pt_min{particle_pt_min}'], pid=False, charge=False)
 
                     if model_settings['charge']:
                         model_label = f'pfn_charge_minpt{particle_pt_min}'
+                        self.AUC[f'{model_label}{self.key_suffix}'] = []
                         self.fit_pfn(model_label, model_settings, self.y, self.X_particles[f'particle_pt_min{particle_pt_min}'], pid=False, charge=True)
                 
             if model == 'efn':
