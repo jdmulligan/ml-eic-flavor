@@ -210,17 +210,6 @@ class AnalyzeFlavor(common_base.CommonBase):
                 self.model_settings[model]['cv'] = config[model]['cv']
                 self.model_settings[model]['lda_tol'] = [float(x) for x in config[model]['lda_tol']]
 
-            if 'lasso' in model:
-                self.model_settings[model]['alpha'] = config[model]['alpha']
-                self.model_settings[model]['max_iter'] = config[model]['max_iter']
-                self.model_settings[model]['tol'] = float(config[model]['tol'])
-                self.model_settings[model]['n_iter'] = config[model]['n_iter']
-                self.model_settings[model]['cv'] = config[model]['cv']
-                if 'nsub' in model:
-                    self.K_lasso = config[model]['K_lasso']
-                if 'efp' in model:
-                    self.d_lasso = config[model]['d_lasso']
-
             if model == 'pfn':
                 self.model_settings[model]['Phi_sizes'] = tuple(config[model]['Phi_sizes'])
                 self.model_settings[model]['F_sizes'] = tuple(config[model]['F_sizes'])
@@ -317,9 +306,6 @@ class AnalyzeFlavor(common_base.CommonBase):
 
             # Set up dict to store roc curves
             self.roc_curve_dict = {}
-            self.roc_curve_dict_lasso = {}
-            self.N_terms_lasso = {}
-            self.observable_lasso = {}
             for model in self.models:
                 self.roc_curve_dict[model] = {}
 
@@ -327,7 +313,7 @@ class AnalyzeFlavor(common_base.CommonBase):
             self.plot_QA()
 
             # Compute EFPs
-            if 'efp_dnn' in self.models or 'efp_linear' in self.models or 'efp_lasso' in self.models:
+            if 'efp_dnn' in self.models or 'efp_linear' in self.models:
 
                 print()
                 print(f'Calculating d <= {self.dmax} EFPs for {self.n_total} jets... ')
@@ -386,17 +372,6 @@ class AnalyzeFlavor(common_base.CommonBase):
                     self.X_EFP_train[d] = sklearn.preprocessing.scale(X_EFP_train_d.astype(np.float128))
 
                 print('Done.') 
-
-                # Plot a few single observables
-
-                # EFP Lasso for paper -- run with d = 4
-                #observable = '[(0, 1)] + 3.54* [(0, 1), (0, 2)] + 1.72 * [(0, 1), (0, 2), (0, 3), (0, 4)] -3.82 * [(0, 1), (0, 1), (2, 3), (2, 3)]'
-                if self.dmax == 4:
-                    observable = rf'$\mathcal{{O}}^{{\mathrm{{ML}}}}_{{\mathrm{{EFP}}}}$ (4 terms)' 
-                    ylabel = rf'$\frac{{1}}{{\sigma}} \frac{{d\sigma}}{{ d \mathcal{{O}}^{{\mathrm{{ML}}}}_{{\mathrm{{EFP}}}} }}$'
-                    X = self.X_EFP_train[self.dmax][:,0] + 3.54*self.X_EFP_train[self.dmax][:,4] + 1.72*self.X_EFP_train[self.dmax][:,17] - 3.82*self.X_EFP_train[self.dmax][:,23]
-                    y = self.Y_EFP_train[self.dmax]
-                    self.plot_observable(X, y, xlabel=observable, ylabel=ylabel, filename='EFP_0_4_17_23.pdf')
 
             # Train models
             self.train_models(jet_pt_min)
@@ -735,8 +710,6 @@ class AnalyzeFlavor(common_base.CommonBase):
                         self.fit_efp_linear(model, model_settings, d)
                     if model == 'efp_dnn':
                         self.fit_efp_dnn(model, model_settings, d)
-                if model == 'efp_lasso':
-                    self.fit_efp_lasso(model, model_settings, self.d_lasso)
 
             # Deep sets
             if model == 'pfn':
@@ -764,7 +737,6 @@ class AnalyzeFlavor(common_base.CommonBase):
         # Plot traditional observables
         for observable in self.qa_observables:
             if self.y.size == len(self.qa_results[observable]):
-                self.roc_curve_dict_lasso[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]).astype(np.float))
                 self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]).astype(np.float))
             else:
                 print(f'Skip constructing ROC curve for observable={observable}, due to mismatch with number of labels')
@@ -776,14 +748,6 @@ class AnalyzeFlavor(common_base.CommonBase):
                 pickle.dump(self.roc_curve_dict, f)
                 pickle.dump(self.AUC, f)
 
-        # Separate lasso from others, so that we can re-run it quickly
-        if 'efp_lasso' in self.models:
-            output_filename = os.path.join(self.output_dir_i, f'ROC{self.key_suffix}_lasso.pkl')
-            with open(output_filename, 'wb') as f_lasso:
-                pickle.dump(self.roc_curve_dict_lasso, f_lasso)
-                pickle.dump(self.N_terms_lasso, f_lasso)
-                pickle.dump(self.observable_lasso, f_lasso)
-
     #---------------------------------------------------------------
     # Fit linear model for EFPs
     #---------------------------------------------------------------
@@ -794,17 +758,6 @@ class AnalyzeFlavor(common_base.CommonBase):
         y_train = self.Y_EFP_train[d]
         y_test = self.Y_EFP_test[d]
         self.fit_linear_model(X_train, y_train, X_test, y_test, model, model_settings, dim_label='d', dim=d, type='LDA_search')
-
-    #---------------------------------------------------------------
-    # Fit Lasso for EFPs
-    #---------------------------------------------------------------
-    def fit_efp_lasso(self, model, model_settings, d):
-
-        X_train = self.X_EFP_train[self.d_lasso]
-        X_test = self.X_EFP_test[self.d_lasso]
-        y_train = self.Y_EFP_train[self.d_lasso]
-        y_test = self.Y_EFP_test[self.d_lasso]
-        self.fit_lasso(X_train, y_train, X_test, y_test, model, model_settings, dim_label='d', dim=d, observable_type='sum')
 
     #---------------------------------------------------------------
     # Fit Dense Neural Network for EFPs
@@ -903,167 +856,6 @@ class AnalyzeFlavor(common_base.CommonBase):
 
             # Compute ROC curve: the roc_curve() function expects labels and scores
             self.roc_curve_dict[model][dim] = sklearn.metrics.roc_curve(y_train, y_predict_train)
-
-    #---------------------------------------------------------------
-    # Fit Lasso
-    #
-    #   The parameter alpha multiplies to L1 term
-    #   If convergence error: can increase max_iter and/or tol, and/or set normalize=True
-    # 
-    # observable_type: ['product', 'sum']
-    #   - if sum observable, we assume preprocessing is done beforehand
-    #   - if product observable, can uncomment preprocessing below after taking log (but off by default)
-    #---------------------------------------------------------------
-    def fit_lasso(self, X_train, y_train, X_test, y_test, model, model_settings, dim_label='', dim=None, observable_type='product'):
-        print()
-        print(f'Training {model} ({observable_type} observable), {dim_label}={dim}...')
-        
-        # First, copy the test training labels, which we will need for ROC curve
-        # This is needed because for product observable we don't want to take the log
-        y_test_roc = y_test.copy()
-        y_train_roc = y_train.copy()
-
-        # If product observable, take the logarithm of the data and labels, such that the product observable 
-        # becomes a sum and the exponents in the product observable become the regression weights
-        if observable_type == 'product':
-
-            offset = 1.e-4
-            X_train = np.log(X_train + offset)
-            X_test = np.log(X_test + offset)
-
-            eps = .01
-            y_train = np.log(eps + (1. - 2. * eps) * y_train)
-            y_test = np.log(eps + (1. - 2. * eps) * y_test)
-
-            # Preprocessing: zero mean unit variance
-            #X_train = sklearn.preprocessing.scale(X_train)
-            #X_test = sklearn.preprocessing.scale(X_test)
-
-        # Loop through values of regularization parameter
-        self.roc_curve_dict_lasso[model] = {}
-        self.N_terms_lasso[model] = {}
-        self.observable_lasso[model] = {}
-
-        for alpha in model_settings['alpha']:
-            self.fit_lasso_single_alpha(alpha, X_train, y_train, X_test, y_test, y_test_roc, y_train_roc, model, model_settings, 
-                                        dim_label=dim_label, dim=dim, observable_type=observable_type)
-
-    #---------------------------------------------------------------
-    # Fit Lasso for a single alpha value
-    #---------------------------------------------------------------
-    def fit_lasso_single_alpha(self, alpha, X_train, y_train, X_test, y_test, y_test_roc, y_train_roc, model, model_settings, 
-                                dim_label='', dim=None, observable_type='product'):
-        print()
-        print(f'Fitting lasso regression with alpha = {alpha}')
-    
-        lasso_clf = sklearn.linear_model.Lasso(alpha=alpha, max_iter=model_settings['max_iter'],
-                                                tol=model_settings['tol'])
-                                                
-        plot_learning_curve = False
-        if plot_learning_curve:
-            # Split into validation set
-            X_train, X_val, y_train, y_val = sklearn.model_selection.train_test_split(X_train, y_train, test_size=0.2)
-            train_errors = []
-            validation_errors = []
-            train_sizes = np.linspace(0, len(X_train)/2, 50)[1:]
-            print('Compute Lasso learning curve...')
-            for train_size in train_sizes:
-                train_size = int(train_size)
-                lasso_clf.fit(X_train[:train_size], y_train[:train_size])
-                y_predict_train = lasso_clf.predict(X_train[:train_size])
-                y_predict_val = lasso_clf.predict(X_val)
-                train_errors.append(sklearn.metrics.mean_squared_error(y_predict_train, y_train[:train_size]))
-                validation_errors.append(sklearn.metrics.mean_squared_error(y_predict_val, y_val))
-        else:
-            # Cross-validation
-            lasso_clf.fit(X_train, y_train)
-            scores = sklearn.model_selection.cross_val_score(lasso_clf, X_train, y_train,
-                                                                        scoring='neg_mean_squared_error',
-                                                                        cv=model_settings['cv'])
-            print(f'cross-validation scores: {scores}')
-            y_predict_train = lasso_clf.predict(X_train)
-            rmse = sklearn.metrics.mean_squared_error(y_train, y_predict_train)
-            print(f'training rmse: {rmse}')
-
-        # Compute AUC on test set
-        y_predict_test = lasso_clf.predict(X_test)
-        auc_test = sklearn.metrics.roc_auc_score(y_test_roc, y_predict_test)
-        rmse_test = sklearn.metrics.mean_squared_error(y_test, y_predict_test)
-        print(f'AUC = {auc_test} (test set)')
-        print(f'test rmse: {rmse_test}')
-        
-        # ROC curve
-        self.roc_curve_dict_lasso[model][alpha] = sklearn.metrics.roc_curve(y_test_roc, y_predict_test)
-        
-        if plot_learning_curve:
-            plt.axis([0, train_sizes[-1], 0, 10])
-            plt.xlabel('training size', fontsize=16)
-            plt.ylabel('MSE', fontsize=16)
-            plt.plot(train_sizes, train_errors, linewidth=2,
-                        linestyle='solid', alpha=0.9, color=sns.xkcd_rgb['dark sky blue'], label='train')
-            plt.plot(train_sizes, validation_errors, linewidth=2,
-                        linestyle='solid', alpha=0.9, color=sns.xkcd_rgb['watermelon'], label='val')
-            plt.axline((0, rmse_test), (len(X_train), rmse_test), linewidth=4, label='test',
-                        linestyle='dotted', alpha=0.9, color=sns.xkcd_rgb['medium green'])
-            plt.legend(loc='best', fontsize=12)
-            plt.tight_layout()
-            plt.savefig(os.path.join(self.output_dir_i, f'Lasso_learning_curve_a{alpha}.pdf'))
-            plt.close()
-
-        # Print out observable
-        observable = ''
-        n_terms = 0
-        coeffs = lasso_clf.coef_
-        nonzero_coeffs = coeffs[np.absolute(coeffs)>1e-10]
-        mean_coeff = np.mean(np.absolute(nonzero_coeffs))
-        if observable_type == 'product' and np.mean(nonzero_coeffs) < 0.:
-            mean_coeff *= -1
-        elif observable_type == 'sum' and np.mean( np.dot(X_test, coeffs) ) < 0:
-            mean_coeff *= -1
-        print(f'mean_coeff: {mean_coeff}')
-        coeffs = np.divide(coeffs, mean_coeff)
-        for i,_ in enumerate(coeffs):
-            coeff = np.round(coeffs[i], 3)
-            if not np.isclose(coeff, 0., atol=1e-10):
-                n_terms += 1
-
-                if observable_type == 'product':
-                    if 'efp' in model:
-                        observable += rf'({self.graphs[i]})^{{{coeff}}} '
-
-                elif observable_type == 'sum':
-                    if 'efp' in model:
-                        if n_terms > 0:
-                            observable += ' + '
-                        observable += f'{coeff} * {self.graphs[i]}'
-
-        print(f'Observable: {observable}')
-
-        self.N_terms_lasso[model][alpha] = n_terms
-        self.observable_lasso[model][alpha] = observable
-
-        # Plot observable
-        if observable_type == 'product':
-            designed_observable = np.exp( np.dot(X_train, coeffs) )
-            y = y_train_roc
-        elif observable_type == 'sum':
-            designed_observable = np.dot(X_test, coeffs) # For EFPs use X_test since is not preprocessed
-            y = y_test_roc
-        xlabel = rf'$\mathcal{{O}} = {observable}$'
-        ylabel = rf'$\frac{{1}}{{\sigma}} \frac{{d\sigma}}{{ d \mathcal{{O}} }}$'
-        if 'nsub' in model:
-            if n_terms < 5:
-                xfontsize=12
-            else:
-                xfontsize=8
-        elif 'efp' in model:
-            if n_terms < 2:
-                xfontsize=12
-            else:
-                xfontsize=6
-        logy = 'nsub' in model
-
-        self.plot_observable(designed_observable, y, xlabel=xlabel, ylabel=ylabel, filename=f'{model}_{alpha}.pdf', logy=logy)
 
     #---------------------------------------------------------------
     # Train DNN, using hyperparameter optimization with keras tuner
