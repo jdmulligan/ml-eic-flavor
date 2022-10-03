@@ -673,7 +673,7 @@ class AnalyzeFlavor(common_base.CommonBase):
                     jet_pt = 0
                     for particle in jet:
                         pt = particle[0]
-                        charge = particle[5]
+                        charge = particle[6]
                         jet_pt += pt
                         jet_charge += charge * np.power(pt, kappa)
                     jet_charge = jet_charge / np.power(jet_pt, kappa)
@@ -681,7 +681,7 @@ class AnalyzeFlavor(common_base.CommonBase):
 
                     # Check properties of charge=0 jets
                     if np.isclose(jet_charge, 0.):
-                        pid = jet[:,4]
+                        pid = jet[:,5]
                         pid_nonzero = pid[ pid != 0]
                         self.qa_results[f'jet_charge0_ptmin{particle_pt_min}_k{kappa}_multiplicity'].append(pid_nonzero.size)
 
@@ -693,12 +693,12 @@ class AnalyzeFlavor(common_base.CommonBase):
                         if np.any(np.in1d(pid_nonzero, charged_pids)):
                             charge0_jets_with_charged_constituents[i] = jet
                             print(f'WARNING: unexpected jet charge={jet_charge}')
-                            print(f'pid: {jet[:,4][ jet[:,4] != 0]}')
-                            print(f'pid: {jet[:pid_nonzero.size,4]}')
-                            print(f'charge: {jet[:pid_nonzero.size,5]}')
+                            print(f'pid: {jet[:,5][ jet[:,5] != 0]}')
+                            print(f'pid: {jet[:pid_nonzero.size,5]}')
+                            print(f'charge: {jet[:pid_nonzero.size,6]}')
                             print(f'pt: {jet[:,0][ jet[:,0] != 0]}')
-                            print(f'eta: {jet[:,1][ jet[:,1] != 0]}')
-                            print(f'phi: {jet[:,2][ jet[:,2] != 0]}')
+                            print(f'eta: {jet[:,2][ jet[:,2] != 0]}')
+                            print(f'phi: {jet[:,3][ jet[:,3] != 0]}')
                             print()
 
                 if charge0_jets_with_charged_constituents:        
@@ -714,7 +714,7 @@ class AnalyzeFlavor(common_base.CommonBase):
             print(f'    for jets with particle_pt_min={particle_pt_min}')
             for jet in self.X_particles[f'particle_pt_min{particle_pt_min}']:
 
-                pid = jet[:,4]
+                pid = jet[:,5]
                 pid_nonzero = pid[ pid != 0]
 
                 # Compute particle multiplicity
