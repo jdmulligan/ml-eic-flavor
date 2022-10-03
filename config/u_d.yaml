@@ -15,6 +15,7 @@ particle_pt_min_list: [0, 0.2, 0.4]
 input_files:
  #- /rstorage/ml-eic-flavor/uds/20220912/LODIS_flavorjets_1.txt
  #- '/pscratch/sd/j/jdmull/ml-eic-flavor/uds/LODIS_flavorjets_1.txt'
+ #- '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/test.txt'
  - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_1.txt'
  - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_2.txt'
  - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20220912/LODIS_flavorjets_3.txt'

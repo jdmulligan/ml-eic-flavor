@@ -461,7 +461,14 @@ class AnalyzeFlavor(common_base.CommonBase):
 
         # Otherwise group by event, make some modifications to each dataframe, and aggregate back into dataframe
         else:
-            jet_df = jet_df.groupby(['event']).apply(self.preprocess_event, particle_input_type)
+            jet_df = jet_df.groupby(['event'], as_index=False).apply(self.preprocess_event, particle_input_type).reset_index(drop=True)
+
+            # For DIS jets, set jet indices for out-of-jet particles to be the same as the in-jet particles
+            if self.event_type == 'dis':
+                if particle_input_type in ['out', 'in+out']:
+                    jet_df['jet'] = jet_df['event']
+            elif self.event_type == 'photoproduction':
+                sys.exit('Not yet implemented')
 
         # Filter by jet pt
         jet_df = jet_df[jet_df['jetpT']>jet_pt_min]
@@ -618,9 +625,6 @@ class AnalyzeFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     def preprocess_event(self, event, particle_input_type):
 
-        # We need to loop through each event and make some modifications to each dataframe
-        #for _,event in jet_df_grouped:
-
         # For DIS, check that there is only one jet per event
         n_jets = event[event['jet']>0]['jet'].nunique()
         if n_jets != 1:
@@ -639,6 +643,9 @@ class AnalyzeFlavor(common_base.CommonBase):
             # If only out-of-jet particles are requested, remove the jet particles
             if particle_input_type == 'out':
                 event = event[event.jet < 0]
+
+            # Reset the ct index
+            event['ct'] = range(1, len(event.index)+1)
 
         return event
 
@@ -775,12 +782,13 @@ class AnalyzeFlavor(common_base.CommonBase):
             if model == 'efn':
                 self.fit_efn(model, model_settings)
 
-        # Plot traditional observables
-        for observable in self.qa_observables:
-            if self.y.size == len(self.qa_results[observable]):
-                self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]).astype(np.float))
-            else:
-                print(f'Skip constructing ROC curve for observable={observable}, due to mismatch with number of labels')
+        # Save traditional observables (only for "in-jet" case, to save time)
+        if particle_input_type == 'in':
+            for observable in self.qa_observables:
+                if self.y.size == len(self.qa_results[observable]):
+                    self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]).astype(np.float))
+                else:
+                    print(f'Skip constructing ROC curve for observable={observable}, due to mismatch with number of labels')
 
         # Save ROC curves to file
         if 'nsub_dnn' in self.models or 'efp_dnn' in self.models or 'nsub_linear' in self.models or 'efp_linear' in self.models or 'pfn' in self.models or 'efn' in self.models:
@@ -994,12 +1002,15 @@ class AnalyzeFlavor(common_base.CommonBase):
             X_PFN = X_particles[:,:,[1,2,3,5]]
 
         # Preprocess by centering jets
-        for x_PFN in X_PFN:
-            mask = x_PFN[:,0] > 0
-            yphi_avg = np.average(x_PFN[mask,1:3], weights=x_PFN[mask,0], axis=0)
-            x_PFN[mask,1:3] -= yphi_avg
-            # Don't normalize pt, since we already converted to z in data loading
-            #x_PFN[mask,0] /= x_PFN[:,0].sum()
+        # For DIS, all particles (both in-jet and out-of-jet) are already centered in eta-phi 
+        #          around leading jet, so we can skip this step
+        # (note that out-of-jet particles can be empty, i.e. only zerp pads, which will cause crash if not handled)
+        #for x_PFN in X_PFN:
+        #    mask = x_PFN[:,0] > 0
+        #    yphi_avg = np.average(x_PFN[mask,1:3], weights=x_PFN[mask,0], axis=0)
+        #    x_PFN[mask,1:3] -= yphi_avg
+        #    # Don't normalize pt, since we already converted to z in data loading
+        #    #x_PFN[mask,0] /= x_PFN[:,0].sum()
         
         # Handle particle id channel
         if pid:
