@@ -63,6 +63,8 @@ class PlotFlavor(common_base.CommonBase):
         self.class1_label = class_labels[0]
         self.class2_label = class_labels[1]
 
+        self.particle_input_type_list = config['particle_input']
+
         self.particle_pt_min_list = config['particle_pt_min_list']
 
         self.models = config['models']
@@ -72,26 +74,27 @@ class PlotFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     def plot_flavor(self):
     
-        # Loop through min jet pt datasets
+        # Loop through combinations of jet_pt_min, particle_input type
         for jet_pt_min in self.jet_pt_min_list:
+            for particle_input_type in self.particle_input_type_list:
 
-            if not self.models:
-                continue
-        
-            # Create output dir
-            self.output_dir_i = os.path.join(self.output_dir, f'pt{jet_pt_min}')
-            if not os.path.exists(self.output_dir_i):
-                os.makedirs(self.output_dir_i)
+                if not self.models:
+                    continue
+            
+                # Create output dir
+                self.output_dir_i = os.path.join(self.output_dir, f'pt{jet_pt_min}_{particle_input_type}')
+                if not os.path.exists(self.output_dir_i):
+                    os.makedirs(self.output_dir_i)
 
-            # Load ML results from file
-            self.key_suffix = f'pt{jet_pt_min}'
-            roc_filename = os.path.join(self.output_dir_i, f'ROC{self.key_suffix}.pkl')
-            with open(roc_filename, 'rb') as f:
-                self.roc_curve_dict = pickle.load(f)
-                self.AUC = pickle.load(f)
+                # Load ML results from file
+                self.key_suffix = f'pt{jet_pt_min}_{particle_input_type}'
+                roc_filename = os.path.join(self.output_dir_i, f'ROC{self.key_suffix}.pkl')
+                with open(roc_filename, 'rb') as f:
+                    self.roc_curve_dict = pickle.load(f)
+                    self.AUC = pickle.load(f)
 
-            # Plot models for a single setting
-            self.plot_models(jet_pt_min)
+                # Plot models for a single setting
+                self.plot_models(jet_pt_min)
 
     #---------------------------------------------------------------
     # Plot several versions of ROC curves and significance improvement
