@@ -162,6 +162,7 @@ class AnalyzeFlavor(common_base.CommonBase):
             self.n_particles_per_jet_max = config['n_particles_per_jet_max']
 
         self.jet_pt_min_list= config['jet_pt_min_list']
+        self.particle_input_type_list = config['particle_input']
         self.jetR = 0.4
         self.kappa = config['kappa']
         self.particle_pt_min_list = config['particle_pt_min_list']
@@ -231,150 +232,152 @@ class AnalyzeFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     def analyze_flavor(self):
 
-        # Loop through combinations of event type, jetR, and R_max
+        # Loop through combinations of jet_pt_min, particle_input type
         self.AUC = {}
         for jet_pt_min in self.jet_pt_min_list:
+            print(f'jet_pt_min: {jet_pt_min}')
+            for particle_input_type in self.particle_input_type_list:
+                print(f'  particle_input_type: {particle_input_type}')
 
-            # Skip if no models are selected
-            if not self.models:
-                continue
-        
-            # Clear variables
-            self.y = None
-            self.X_particles = {}
+                # Skip if no models are selected
+                if not self.models:
+                    continue
+            
+                # Clear variables
+                self.y = None
+                self.X_particles = {}
 
-            # Create output dir
-            self.output_dir_i = os.path.join(self.output_dir, f'pt{jet_pt_min}')
-            if not os.path.exists(self.output_dir_i):
-                os.makedirs(self.output_dir_i)
+                # Create output dir
+                self.output_dir_i = os.path.join(self.output_dir, f'pt{jet_pt_min}_{particle_input_type}')
+                if not os.path.exists(self.output_dir_i):
+                    os.makedirs(self.output_dir_i)
 
-            # Read input file into dataframe -- the files store the particle info as: (pt, eta, phi, pid)
-            # Then transform these into a 3D numpy array (jets, particles, particle info)
-            # The format of the particle info in X_particles will be: (pt, eta, phi, m, pid, charge)
-            X_particles_total, self.y_total = self.load_training_data(jet_pt_min)
+                # Read input file into dataframe -- the files store the particle info as: (pt, eta, phi, pid)
+                # Then transform these into a 3D numpy array (jets, particles, particle info)
+                # The format of the particle info in X_particles will be: (pt, eta, phi, m, pid, charge)
+                X_particles_total, self.y_total = self.load_training_data(jet_pt_min, particle_input_type)
 
-            # Determine total number of jets
-            total_jets = int(self.y_total.size)
-            total_jets_class2 = int(np.sum(self.y_total))
-            total_jets_class1 = total_jets - total_jets_class2
-            print(f'Total number of jets available: {total_jets_class1} ({self.class1_label}), {total_jets_class2} ({self.class2_label})')
+                # Determine total number of jets
+                total_jets = int(self.y_total.size)
+                total_jets_class2 = int(np.sum(self.y_total))
+                total_jets_class1 = total_jets - total_jets_class2
+                print(f'    Total number of jets available: {total_jets_class1} ({self.class1_label}), {total_jets_class2} ({self.class2_label})')
 
-            # If there is an imbalance, remove excess jets
-            if self.balance_samples:
-                if total_jets_class1 > total_jets_class2:
-                    indices_to_remove = np.where( np.isclose(self.y_total,0) )[0][total_jets_class2:]
-                elif total_jets_class1 < total_jets_class2:
-                    indices_to_remove = np.where( np.isclose(self.y_total,1) )[0][total_jets_class1:]
-                y_balanced = np.delete(self.y_total, indices_to_remove)
-                X_particles_balanced = np.delete(X_particles_total, indices_to_remove, axis=0)
-                total_jets = int(y_balanced.size)
-                total_jets_class1 = int(np.sum(y_balanced))
-                total_jets_class2 = total_jets - total_jets_class1
-                print(f'Total number of jets available after balancing: {total_jets_class1} ({self.class1_label}), {total_jets_class2} ({self.class2_label})')
-            else:
-                y_balanced = self.y_total
-                X_particles_balanced = X_particles_total
+                # If there is an imbalance, remove excess jets
+                if self.balance_samples:
+                    if total_jets_class1 > total_jets_class2:
+                        indices_to_remove = np.where( np.isclose(self.y_total,0) )[0][total_jets_class2:]
+                    elif total_jets_class1 < total_jets_class2:
+                        indices_to_remove = np.where( np.isclose(self.y_total,1) )[0][total_jets_class1:]
+                    y_balanced = np.delete(self.y_total, indices_to_remove)
+                    X_particles_balanced = np.delete(X_particles_total, indices_to_remove, axis=0)
+                    total_jets = int(y_balanced.size)
+                    total_jets_class1 = int(np.sum(y_balanced))
+                    total_jets_class2 = total_jets - total_jets_class1
+                    print(f'    Total number of jets available after balancing: {total_jets_class1} ({self.class1_label}), {total_jets_class2} ({self.class2_label})')
+                else:
+                    y_balanced = self.y_total
+                    X_particles_balanced = X_particles_total
 
-            # Reset the training,test,validation sizes based on the balanced number of jets
-            self.n_total = total_jets
-            self.n_train = int(self.n_total * self.train_frac)
-            self.n_test = int(self.n_total * self.test_frac)
-            self.n_val = self.n_total - self.n_train - self.n_test # int((self.n_total - self.n_test) * self.val_frac)
-            print(f'n_train: {self.n_train}, n_test: {self.n_test}, n_val: {self.n_val}')
+                # Reset the training,test,validation sizes based on the balanced number of jets
+                self.n_total = total_jets
+                self.n_train = int(self.n_total * self.train_frac)
+                self.n_test = int(self.n_total * self.test_frac)
+                self.n_val = self.n_total - self.n_train - self.n_test # int((self.n_total - self.n_test) * self.val_frac)
+                print(f'n_train: {self.n_train}, n_test: {self.n_test}, n_val: {self.n_val}')
 
-            # Shuffle dataset 
-            idx = np.random.permutation(len(y_balanced))
-            if y_balanced.shape[0] == idx.shape[0]:
-                y_shuffled = y_balanced[idx]
-                X_particles_shuffled = X_particles_balanced[idx]
-            else:
-                print(f'MISMATCH of shape: {y_shuffled.shape} vs. {idx.shape}')
+                # Shuffle dataset 
+                idx = np.random.permutation(len(y_balanced))
+                if y_balanced.shape[0] == idx.shape[0]:
+                    y_shuffled = y_balanced[idx]
+                    X_particles_shuffled = X_particles_balanced[idx]
+                else:
+                    print(f'MISMATCH of shape: {y_shuffled.shape} vs. {idx.shape}')
 
-            # Truncate the input arrays to the requested size
-            self.y = y_shuffled[:self.n_total]
-            self.X_particles_unfiltered = X_particles_shuffled[:self.n_total]
-            print(f'y_shuffled sum: {np.sum(self.y)}')
-            print(f'y_shuffled shape: {self.y.shape}')
+                # Truncate the input arrays to the requested size
+                self.y = y_shuffled[:self.n_total]
+                self.X_particles_unfiltered = X_particles_shuffled[:self.n_total]
+                print(f'    y_shuffled sum: {np.sum(self.y)}')
+                print(f'    y_shuffled shape: {self.y.shape}')
 
-            # Create additional sets of four-vectors in which a min-pt cut is applied -- the labels can stay the same
-            if 'pfn' in self.models:
-                for particle_pt_min in self.particle_pt_min_list:
-                    self.X_particles[f'particle_pt_min{particle_pt_min}'] = filter_four_vectors(np.copy(self.X_particles_unfiltered), min_pt=particle_pt_min)
+                # Create additional sets of four-vectors in which a min-pt cut is applied -- the labels can stay the same
+                if 'pfn' in self.models:
+                    for particle_pt_min in self.particle_pt_min_list:
+                        self.X_particles[f'particle_pt_min{particle_pt_min}'] = filter_four_vectors(np.copy(self.X_particles_unfiltered), min_pt=particle_pt_min)
 
-            # Also compute some jet observables
-            self.compute_jet_observables()
+                # Also compute some jet observables
+                if particle_input_type == 'in':
+                    self.compute_jet_observables()
+                    self.plot_QA()
 
-            # Set up dict to store roc curves
-            self.roc_curve_dict = {}
-            for model in self.models:
-                self.roc_curve_dict[model] = {}
+                # Set up dict to store roc curves
+                self.roc_curve_dict = {}
+                for model in self.models:
+                    self.roc_curve_dict[model] = {}
 
-            # Plot the input data
-            self.plot_QA()
+                # Compute EFPs
+                if 'efp_dnn' in self.models or 'efp_linear' in self.models:
 
-            # Compute EFPs
-            if 'efp_dnn' in self.models or 'efp_linear' in self.models:
-
-                print()
-                print(f'Calculating d <= {self.dmax} EFPs for {self.n_total} jets... ')
-                
-                # Specify parameters of EFPs
-                # TODO: check beta dependence !!
-                efpset = energyflow.EFPSet(('d<=', self.dmax), measure=self.efp_measure, beta=self.efp_beta)
-
-                # Load labels and data, four vectors. Format: (pT,y,phi,m). 
-                # Note: no PID yet which would be 5th entry... check later!
-                # To make sure, don't need any further preprocessing like for EFNs?
-                X_EFP = self.X_particles['particle_pt_min0'][:,:,:4] # Remove pid,charge from self.X_particles
-                Y_EFP = self.y #Note not "to_categorical" here... 
-    
-                # Switch here to Jesse's quark/gluon data set.
-                #X_EFP, self.Y_EFP = energyflow.datasets.qg_jets.load(self.n_train + self.n_val + self.n_test)
-                
-                # Convert to list of np.arrays of jets in format (pT,y,phi,mass or PID) -> dim: (# jets, # particles in jets, #4)
-                # and remove zero entries
-                masked_X_EFP = [x[x[:,0] > 0] for x in X_EFP]
-                
-                # Now compute EFPs
-                X_EFP = efpset.batch_compute(masked_X_EFP)
-
-                # Record which EFPs correspond to which indices
-                # Note: graph images are available here: https://github.com/pkomiske/EnergyFlow/tree/images/graphs
-                self.graphs = efpset.graphs()[1:]
-                for i,efp in enumerate(self.graphs):
-                    print(f'  efp {i} -- edges: {efp}')
-
-                # Preprocess, plot, and store the EFPs for each d
-                self.X_EFP_train = {}
-                self.X_EFP_test = {}
-                self.Y_EFP_train = {}
-                self.Y_EFP_test = {}
-                for d in range(1, self.dmax+1):
-
-                    # Select EFPs with degree <= d
-                    X_EFP_d = X_EFP[:,efpset.sel(('d<=', d))]
-
-                    # Remove the 0th EFP (=1)
-                    X_EFP_d = X_EFP_d[:,1:]
-                    print(f'There are {X_EFP_d.shape[1]} terms for d<={d} (connected + disconnected, and excluding d=0)')
-
-                    # Plot EFPs
-                    if d == 2:
-                        self.plot_efp_distributions(d, X_EFP_d, suffix='before_scaling')
-                        self.plot_efp_distributions(d, sklearn.preprocessing.scale(X_EFP_d.astype(np.float128)), suffix='after_scaling')
-
-                    # Do train/val/test split (Note: separate val_set generated in DNN training.)
-                    (X_EFP_train_d, X_EFP_val, 
-                        self.X_EFP_test[d], self.Y_EFP_train[d], 
-                        Y_EFP_val, self.Y_EFP_test[d]) = energyflow.utils.data_split(X_EFP_d, Y_EFP, val=self.n_val, test=self.n_test)
+                    print()
+                    print(f'Calculating d <= {self.dmax} EFPs for {self.n_total} jets... ')
                     
-                    # Preprocessing: zero mean unit variance
-                    self.X_EFP_train[d] = sklearn.preprocessing.scale(X_EFP_train_d.astype(np.float128))
+                    # Specify parameters of EFPs
+                    # TODO: check beta dependence !!
+                    efpset = energyflow.EFPSet(('d<=', self.dmax), measure=self.efp_measure, beta=self.efp_beta)
 
-                print('Done.') 
+                    # Load labels and data, four vectors. Format: (pT,y,phi,m). 
+                    # Note: no PID yet which would be 5th entry... check later!
+                    # To make sure, don't need any further preprocessing like for EFNs?
+                    X_EFP = self.X_particles['particle_pt_min0'][:,:,:4] # Remove pid,charge from self.X_particles
+                    Y_EFP = self.y #Note not "to_categorical" here... 
+        
+                    # Switch here to Jesse's quark/gluon data set.
+                    #X_EFP, self.Y_EFP = energyflow.datasets.qg_jets.load(self.n_train + self.n_val + self.n_test)
+                    
+                    # Convert to list of np.arrays of jets in format (pT,y,phi,mass or PID) -> dim: (# jets, # particles in jets, #4)
+                    # and remove zero entries
+                    masked_X_EFP = [x[x[:,0] > 0] for x in X_EFP]
+                    
+                    # Now compute EFPs
+                    X_EFP = efpset.batch_compute(masked_X_EFP)
 
-            # Train models
-            self.train_models(jet_pt_min)
+                    # Record which EFPs correspond to which indices
+                    # Note: graph images are available here: https://github.com/pkomiske/EnergyFlow/tree/images/graphs
+                    self.graphs = efpset.graphs()[1:]
+                    for i,efp in enumerate(self.graphs):
+                        print(f'  efp {i} -- edges: {efp}')
+
+                    # Preprocess, plot, and store the EFPs for each d
+                    self.X_EFP_train = {}
+                    self.X_EFP_test = {}
+                    self.Y_EFP_train = {}
+                    self.Y_EFP_test = {}
+                    for d in range(1, self.dmax+1):
+
+                        # Select EFPs with degree <= d
+                        X_EFP_d = X_EFP[:,efpset.sel(('d<=', d))]
+
+                        # Remove the 0th EFP (=1)
+                        X_EFP_d = X_EFP_d[:,1:]
+                        print(f'There are {X_EFP_d.shape[1]} terms for d<={d} (connected + disconnected, and excluding d=0)')
+
+                        # Plot EFPs
+                        if d == 2:
+                            self.plot_efp_distributions(d, X_EFP_d, suffix='before_scaling')
+                            self.plot_efp_distributions(d, sklearn.preprocessing.scale(X_EFP_d.astype(np.float128)), suffix='after_scaling')
+
+                        # Do train/val/test split (Note: separate val_set generated in DNN training.)
+                        (X_EFP_train_d, X_EFP_val, 
+                            self.X_EFP_test[d], self.Y_EFP_train[d], 
+                            Y_EFP_val, self.Y_EFP_test[d]) = energyflow.utils.data_split(X_EFP_d, Y_EFP, val=self.n_val, test=self.n_test)
+                        
+                        # Preprocessing: zero mean unit variance
+                        self.X_EFP_train[d] = sklearn.preprocessing.scale(X_EFP_train_d.astype(np.float128))
+
+                    print('Done.') 
+
+                # Train models
+                self.train_models(jet_pt_min, particle_input_type)
 
         # Run plotting script
         print()
@@ -385,15 +388,15 @@ class AnalyzeFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     # Load training data from set of input files into numpy arrays
     #---------------------------------------------------------------
-    def load_training_data(self, jet_pt_min):
+    def load_training_data(self, jet_pt_min, particle_input_type):
 
         for i,input_file in enumerate(self.input_files):
-            print(f'Loading file {i+1}/{len(self.input_files)}...')
+            print(f'    Loading file {i+1}/{len(self.input_files)}...')
 
             jet_df = pd.read_csv(input_file, sep='\s+')
-            X_particles, y, class_array = self.create_jet_array(jet_df, jet_pt_min)
-            print(f'X_particles shape: {X_particles.shape}')
-            print(f'y shape: {y.shape}')
+            X_particles, y, class_array = self.create_jet_array(jet_df, jet_pt_min, particle_input_type)
+            print(f'    X_particles shape: {X_particles.shape}')
+            print(f'    y shape: {y.shape}')
 
             if i == 0:
                 X_particles_total = X_particles
@@ -414,8 +417,8 @@ class AnalyzeFlavor(common_base.CommonBase):
                 class_array_total = np.concatenate([class_array_total, class_array])
 
             print()
-            print(f'X_particles_total shape: {X_particles_total.shape}')
-            print(f'y_total shape: {y_total.shape}')
+            print(f'    X_particles_total shape: {X_particles_total.shape}')
+            print(f'    y_total shape: {y_total.shape}')
             print()
 
             # If enough jets have been found, then return
@@ -423,19 +426,20 @@ class AnalyzeFlavor(common_base.CommonBase):
             if y_total.shape[0] > self.n_total:
                 break
 
-        print('Done loading!')
+        print('    Done loading!')
         print()
 
         # Plot statistics for each class
-        classes, counts = np.unique(class_array_total, return_counts=True)
-        classes_count_dict = dict(zip(classes, counts))
-        print(f'class statistics: {classes_count_dict}') 
-        print()
-        plt.bar(list(classes_count_dict.keys()), classes_count_dict.values(), color='g', log=True)
-        plt.ylabel("counts")
-        plt.xlabel("class id")
-        plt.savefig(os.path.join(self.output_dir, f'class_statistics_pt{jet_pt_min}.pdf'))
-        plt.close()
+        if particle_input_type == 'in':
+            classes, counts = np.unique(class_array_total, return_counts=True)
+            classes_count_dict = dict(zip(classes, counts))
+            print(f'class statistics: {classes_count_dict}') 
+            print()
+            plt.bar(list(classes_count_dict.keys()), classes_count_dict.values(), color='g', log=True)
+            plt.ylabel("counts")
+            plt.xlabel("class id")
+            plt.savefig(os.path.join(self.output_dir, f'class_statistics_pt{jet_pt_min}.pdf'))
+            plt.close()
 
         return X_particles_total, y_total
 
@@ -443,7 +447,7 @@ class AnalyzeFlavor(common_base.CommonBase):
     # Parse the input file into a 3D array (jets, particles, particle info)
     # The particle info will be stored as: (pt, eta, phi, m, pid, charge)
     #---------------------------------------------------------------
-    def create_jet_array(self, jet_df, jet_pt_min):
+    def create_jet_array(self, jet_df, jet_pt_min, particle_input_type):
 
         # Set column name to get classes from
         if self.classification_type == 'jet':
@@ -451,19 +455,13 @@ class AnalyzeFlavor(common_base.CommonBase):
         elif self.classification_type == 'event':
             class_key = 'proc'
 
-        # First, remove the particles outside the jets (only present in DIS events)
-        jet_df = jet_df[jet_df.jet > 0]
+        # If only in-jet particles requested, remove the particles outside the jets
+        if particle_input_type == 'in':
+            jet_df = jet_df[jet_df.jet > 0]
 
-        # Add columns of mass and charge
-        jet_df['m'] = energyflow.pids2ms(jet_df['pid'], error_on_unknown=True)
-        jet_df['charge'] = energyflow.pids2chrgs(jet_df['pid'], error_on_unknown=True)
-
-        # Switch order: (pt, eta, phi, pid, m, charge) --> (pt, eta, phi, m, pid, charge)
-        columns = list(jet_df.columns)
-        index_pid = columns.index('pid')
-        index_mass = columns.index('m')
-        columns[index_pid], columns[index_mass] = columns[index_mass], columns[index_pid]
-        jet_df = jet_df[columns]
+        # Otherwise group by event, make some modifications to each dataframe, and aggregate back into dataframe
+        else:
+            jet_df = jet_df.groupby(['event']).apply(self.preprocess_event, particle_input_type)
 
         # Filter by jet pt
         jet_df = jet_df[jet_df['jetpT']>jet_pt_min]
@@ -506,6 +504,19 @@ class AnalyzeFlavor(common_base.CommonBase):
         print(f'class1: {self.classes_class1} ({self.class1_ids}) (ML label 0), class2: {self.classes_class2} ({self.class2_ids}) (ML label 1)')
         print()
         #---
+
+        # Add columns of mass and charge
+        jet_df['m'] = energyflow.pids2ms(jet_df['pid'], error_on_unknown=True)
+        jet_df['charge'] = energyflow.pids2chrgs(jet_df['pid'], error_on_unknown=True)
+
+        # Add column for z = pt,i / ptJet
+        jet_df['z'] = jet_df['pt'] / jet_df['jetpT'] 
+
+        # Switch order: (pt, eta, phi, pid, m, charge, z) --> (pt, z, eta, phi, m, pid, charge)
+        columns = list(jet_df.columns)
+        indices = [columns.index(x) for x in columns]
+        columns[7], columns[8], columns[9], columns[11], columns[12] = columns[12], columns[7], columns[8], columns[9], columns[11]
+        jet_df = jet_df[columns]
 
         # Check pdg values that are present
         pdg_values_present = np.unique(jet_df['pid'].values)
@@ -561,7 +572,7 @@ class AnalyzeFlavor(common_base.CommonBase):
             # Create empty numpy array, which we will fill with zero-padded jets
             n_events = labels.size
             event_size = self.n_jets_max * self.n_particles_per_jet_max
-            n_variables_per_particle = 6
+            n_variables_per_particle = 7
             jet_array = np.zeros((n_events, event_size, n_variables_per_particle))
             print(f'(n_jets, n_particles, n_particle_info) = {jet_array.shape}')
 
@@ -601,6 +612,35 @@ class AnalyzeFlavor(common_base.CommonBase):
                 event_index += 1
 
         return jet_array, labels, class_array
+
+    #---------------------------------------------------------------
+    # Make some modifications to each event dataframe
+    #---------------------------------------------------------------
+    def preprocess_event(self, event, particle_input_type):
+
+        # We need to loop through each event and make some modifications to each dataframe
+        #for _,event in jet_df_grouped:
+
+        # For DIS, check that there is only one jet per event
+        n_jets = event[event['jet']>0]['jet'].nunique()
+        if n_jets != 1:
+            return event[event['jet']>0]
+
+        # If only in-jet particles requested, remove the particles outside the jets
+        if particle_input_type == 'in':
+            event = event[event.jet > 0]
+        
+        # Otherwise, set jetPt and class label for all rows based on the first row
+        else:
+
+            event['jetpT'] = event['jetpT'].iloc[0]
+            event['qg'] = event['qg'].iloc[0]
+        
+            # If only out-of-jet particles are requested, remove the jet particles
+            if particle_input_type == 'out':
+                event = event[event.jet < 0]
+
+        return event
 
     #---------------------------------------------------------------
     # Compute some individual jet observables
@@ -691,10 +731,10 @@ class AnalyzeFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     # Train models
     #---------------------------------------------------------------
-    def train_models(self, jet_pt_min):
+    def train_models(self, jet_pt_min, particle_input_type):
 
         # Train ML models
-        self.key_suffix = f'pt{jet_pt_min}'
+        self.key_suffix = f'pt{jet_pt_min}_{particle_input_type}'
         for model in self.models:
             print()
         
@@ -715,6 +755,7 @@ class AnalyzeFlavor(common_base.CommonBase):
             if model == 'pfn':
 
                 for particle_pt_min in self.particle_pt_min_list:
+                    print(f'Fitting PFNs for particle_pt_min={particle_pt_min}')
 
                     if model_settings['pid']:
                         model_label = f'pfn_pid_minpt{particle_pt_min}'
@@ -941,22 +982,24 @@ class AnalyzeFlavor(common_base.CommonBase):
     # Fit ML model -- Deep Set/Particle Flow Networks
     #---------------------------------------------------------------
     def fit_pfn(self, model, model_settings, y, X_particles, pid=False, charge=False):
+        print(f'  Fit PFN for {model}')
     
         # Convert labels to categorical
         Y_PFN = energyflow.utils.to_categorical(y, num_classes=2)
                         
-        # (pT,y,phi,pid/charge)
+        # (pt, z, eta, phi, m, pid, charge)
         if charge:
-            X_PFN = X_particles[:,:,[0,1,2,5]]
+            X_PFN = X_particles[:,:,[1,2,3,6]]
         else:
-            X_PFN = X_particles[:,:,[0,1,2,4]]
+            X_PFN = X_particles[:,:,[1,2,3,5]]
 
-        # Preprocess by centering jets and normalizing pts
+        # Preprocess by centering jets
         for x_PFN in X_PFN:
             mask = x_PFN[:,0] > 0
             yphi_avg = np.average(x_PFN[mask,1:3], weights=x_PFN[mask,0], axis=0)
             x_PFN[mask,1:3] -= yphi_avg
-            x_PFN[mask,0] /= x_PFN[:,0].sum()
+            # Don't normalize pt, since we already converted to z in data loading
+            #x_PFN[mask,0] /= x_PFN[:,0].sum()
         
         # Handle particle id channel
         if pid:

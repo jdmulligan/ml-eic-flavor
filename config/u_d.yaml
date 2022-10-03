@@ -3,11 +3,13 @@ event_type: 'dis'
 classification_type: 'jet'
 classes: 'u__d' # The double underscore specifies the two classes to consider
 
-jet_pt_min_list: [10]    # Can loop over different min jet pt 
+jet_pt_min_list: [10]                     # Can loop over different min jet pt 
+particle_input: ['in', 'out', in+out']    # Loop over different sets of input particles: in-jet, out-of-jet, or both
 kappa: [0.3, 0.5, 0.7]
 
 # Train multiple models with different particle min pt (in GeV) (only implemented for PFNs and single jet observables)
 particle_pt_min_list: [0, 0.2, 0.4]
+
 
 # Input files of training data
 input_files:
