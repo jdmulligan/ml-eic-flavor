@@ -67,6 +67,56 @@ def filter_four_vectors(X_particles, min_pt=0.):
 
     return X_particles
 
+#--------------------------------------------------------------- 
+# Compute jet charge
+#---------------------------------------------------------------        
+@jit(nopython=True) 
+def compute_jet_charge(X_particles, kappa):
+
+    jet_charge_array = np.zeros(X_particles.shape[0])
+                    
+    for i in prange(X_particles.shape[0]):
+
+        jet_charge = 0
+        jet_pt = 0
+        for particle in X_particles[i]:
+            pt = particle[0]
+            charge = particle[6]
+            jet_pt += pt
+            jet_charge += charge * np.power(pt, kappa)
+        jet_charge = jet_charge / np.power(jet_pt, kappa)
+
+        jet_charge_array[i] = jet_charge
+
+    return jet_charge_array
+
+#--------------------------------------------------------------- 
+# Compute other jet observables
+# NOTE: np.in1d() is not yet supported in numba, so we allow python mode 
+#---------------------------------------------------------------        
+@jit(nopython=False)
+def compute_other_jet_observables(X_particles):
+
+    particle_multiplicity_array = np.zeros(X_particles.shape[0])
+    strange_tagger_array = np.zeros(X_particles.shape[0])
+        
+    for i in prange(X_particles.shape[0]):
+
+        # Particle multiplicity in jet
+        pid = X_particles[i][:,5]
+        pid_nonzero = pid[ pid != 0]
+        particle_multiplicity = pid_nonzero.size
+            
+        # Compute whether jet has a strange hadron in it
+        strange_particle_pdg = np.array([321, 130, 310, 3222, 3112, 3312, 3322, 3334, 3122, 
+                                         321, -3222, -3112, -3312, -3322, -3334, -3122])
+        found_strange_hadron = np.any(np.in1d(pid_nonzero, strange_particle_pdg))
+        
+        particle_multiplicity_array[i] = particle_multiplicity
+        strange_tagger_array[i] = found_strange_hadron
+
+    return particle_multiplicity_array, strange_tagger_array
+
 ################################################################
 class AnalyzeFlavor(common_base.CommonBase):
 
@@ -177,6 +227,8 @@ class AnalyzeFlavor(common_base.CommonBase):
         self.test_frac = 1. * self.n_test / self.n_total
         self.val_frac = 1. * self.n_val / (self.n_train + self.n_val)
         self.balance_samples = config['balance_samples']
+
+        self.check_properties_of_charge0_jets = False
         
         if 'dmax' in config:
             self.dmax = config['dmax']
@@ -651,7 +703,6 @@ class AnalyzeFlavor(common_base.CommonBase):
 
     #---------------------------------------------------------------
     # Compute some individual jet observables
-    # TODO: speed up w/numba
     #---------------------------------------------------------------
     def compute_jet_observables(self):
         print('Compute jet observables...')
@@ -661,9 +712,10 @@ class AnalyzeFlavor(common_base.CommonBase):
         self.qa_observables = []
         for particle_pt_min in self.particle_pt_min_list:
             self.qa_observables += [f'jet_charge_ptmin{particle_pt_min}_k{kappa}' for kappa in self.kappa]
-            self.qa_observables += [f'jet_charge0_ptmin{particle_pt_min}_k{kappa}_multiplicity' for kappa in self.kappa]
             self.qa_observables += [f'particle_multiplicity_ptmin{particle_pt_min}']
             self.qa_observables += [f'strange_tagger_ptmin{particle_pt_min}']
+            if self.check_properties_of_charge0_jets:
+                self.qa_observables += [f'jet_charge0_ptmin{particle_pt_min}_k{kappa}_multiplicity' for kappa in self.kappa]
 
         # Compute jet charge for each jet collection
         print('  Computing jet charge...')
@@ -672,45 +724,38 @@ class AnalyzeFlavor(common_base.CommonBase):
             for kappa in self.kappa:
                 print(f'      kappa={kappa}...')
 
-                charge0_jets_with_charged_constituents = {}
+                self.qa_results[f'jet_charge_ptmin{particle_pt_min}_k{kappa}'] = compute_jet_charge(self.X_particles[f'particle_pt_min{particle_pt_min}'], kappa)
 
-                for i,jet in enumerate(self.X_particles[f'particle_pt_min{particle_pt_min}']):
+                # Check properties of charge=0 jets=
+                if self.check_properties_of_charge0_jets:
+                    charge0_jets_with_charged_constituents = {}
+                    for i,jet in enumerate():
 
-                    jet_charge = 0
-                    jet_pt = 0
-                    for particle in jet:
-                        pt = particle[0]
-                        charge = particle[6]
-                        jet_pt += pt
-                        jet_charge += charge * np.power(pt, kappa)
-                    jet_charge = jet_charge / np.power(jet_pt, kappa)
-                    self.qa_results[f'jet_charge_ptmin{particle_pt_min}_k{kappa}'].append(jet_charge)
+                        if np.isclose(jet_charge, 0.):
+                            pid = jet[:,5]
+                            pid_nonzero = pid[ pid != 0]
+                            self.qa_results[f'jet_charge0_ptmin{particle_pt_min}_k{kappa}_multiplicity'].append(pid_nonzero.size)
 
-                    # Check properties of charge=0 jets
-                    if np.isclose(jet_charge, 0.):
-                        pid = jet[:,5]
-                        pid_nonzero = pid[ pid != 0]
-                        self.qa_results[f'jet_charge0_ptmin{particle_pt_min}_k{kappa}_multiplicity'].append(pid_nonzero.size)
+                            # Check that the jet contains no charged particles
+                            neutral_pids = np.array([22, 130, 310, 2112, 3322, 3122,
+                                                    -2112, -3322, -3122])
+                            charged_pids = np.array([11, 13, 211, 321, 2212, 3222, 3112, 3312, 3334
+                                                    -11, -13, -211, -321, -2212, -3222, -3112, -3312, -3334])
+                            if np.any(np.in1d(pid_nonzero, charged_pids)):
+                                charge0_jets_with_charged_constituents[i] = jet
+                                print(f'WARNING: unexpected jet charge=0')
+                                print(f'pid: {jet[:,5][ jet[:,5] != 0]}')
+                                print(f'pid: {jet[:pid_nonzero.size,5]}')
+                                print(f'charge: {jet[:pid_nonzero.size,6]}')
+                                print(f'pt: {jet[:,0][ jet[:,0] != 0]}')
+                                print(f'eta: {jet[:,2][ jet[:,2] != 0]}')
+                                print(f'phi: {jet[:,3][ jet[:,3] != 0]}')
+                                print()
 
-                        # Check that the jet contains no charged particles
-                        neutral_pids = np.array([22, 130, 310, 2112, 3322, 3122,
-                                                -2112, -3322, -3122])
-                        charged_pids = np.array([11, 13, 211, 321, 2212, 3222, 3112, 3312, 3334
-                                                -11, -13, -211, -321, -2212, -3222, -3112, -3312, -3334])
-                        if np.any(np.in1d(pid_nonzero, charged_pids)):
-                            charge0_jets_with_charged_constituents[i] = jet
-                            print(f'WARNING: unexpected jet charge={jet_charge}')
-                            print(f'pid: {jet[:,5][ jet[:,5] != 0]}')
-                            print(f'pid: {jet[:pid_nonzero.size,5]}')
-                            print(f'charge: {jet[:pid_nonzero.size,6]}')
-                            print(f'pt: {jet[:,0][ jet[:,0] != 0]}')
-                            print(f'eta: {jet[:,2][ jet[:,2] != 0]}')
-                            print(f'phi: {jet[:,3][ jet[:,3] != 0]}')
-                            print()
-
-                if charge0_jets_with_charged_constituents:        
-                    print(f'WARNING: {len(charge0_jets_with_charged_constituents.keys())} jets with charge=0 (kappa={kappa}) have charged constituents!')
-                    print()
+                if self.check_properties_of_charge0_jets:
+                    if charge0_jets_with_charged_constituents:        
+                        print(f'WARNING: {len(charge0_jets_with_charged_constituents.keys())} jets with charge=0 (kappa={kappa}) have charged constituents!')
+                        print()
 
         print('  Done.')
         print()
@@ -719,19 +764,10 @@ class AnalyzeFlavor(common_base.CommonBase):
         print('  Computing additional observables...')
         for particle_pt_min in self.particle_pt_min_list:
             print(f'    for jets with particle_pt_min={particle_pt_min}')
-            for jet in self.X_particles[f'particle_pt_min{particle_pt_min}']:
 
-                pid = jet[:,5]
-                pid_nonzero = pid[ pid != 0]
-
-                # Compute particle multiplicity
-                self.qa_results[f'particle_multiplicity_ptmin{particle_pt_min}'].append(pid_nonzero.size)
-
-                # Compute whether jet has a strange hadron in it
-                strange_particle_pdg = [321, 130, 310, 3222, 3112, 3312, 3322, 3334, 3122, 
-                                        -321, -3222, -3112, -3312, -3322, -3334, -3122]
-                found_strange_hadron = np.any(np.in1d(pid_nonzero, strange_particle_pdg))
-                self.qa_results[f'strange_tagger_ptmin{particle_pt_min}'].append(found_strange_hadron)
+            particle_multiplicity_array, strange_tagger_array = compute_other_jet_observables(self.X_particles[f'particle_pt_min{particle_pt_min}'])
+            self.qa_results[f'particle_multiplicity_ptmin{particle_pt_min}'] = particle_multiplicity_array
+            self.qa_results[f'strange_tagger_ptmin{particle_pt_min}'] = strange_tagger_array
 
         print('Done.')
 
