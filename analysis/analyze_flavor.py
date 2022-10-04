@@ -832,7 +832,10 @@ class AnalyzeFlavor(common_base.CommonBase):
         if particle_input_type == 'in':
             for observable in self.qa_observables:
                 if self.y.size == len(self.qa_results[observable]):
-                    self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]).astype(np.float))
+                    if 'strange_tagger' in observable:
+                        self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, np.array(self.qa_results[observable]).astype(np.float))
+                    else:
+                        self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]).astype(np.float))
                 else:
                     print(f'Skip constructing ROC curve for observable={observable}, due to mismatch with number of labels')
 

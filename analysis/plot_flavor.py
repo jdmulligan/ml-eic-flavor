@@ -146,17 +146,18 @@ class PlotFlavor(common_base.CommonBase):
         # Plot combination of all possible particle_input_types in a single plot
         type = 'in_vs_out'
         pfn_labels = ['charge', 'pid', 'nopid']
-        for pfn_label in pfn_labels:
-            for particle_pt_min in self.particle_pt_min_list:
+        if len(list(self.roc_curve_dict.keys())) > 1:
+            for pfn_label in pfn_labels:
+                for particle_pt_min in self.particle_pt_min_list:
 
-                roc_list = {}
-                for particle_input_type in ['in', 'out', 'in+out']:
+                    roc_list = {}
+                    for particle_input_type in ['in', 'out', 'in+out']:
 
-                    model = f'pfn_{pfn_label}_minpt{particle_pt_min}'
-                    if model in self.roc_curve_dict[particle_input_type].keys():
-                        roc_list[f'{model}_{particle_input_type}'] = self.roc_curve_dict[particle_input_type][model]
+                        model = f'pfn_{pfn_label}_minpt{particle_pt_min}'
+                        if model in self.roc_curve_dict[particle_input_type].keys():
+                            roc_list[f'{model}_{particle_input_type}'] = self.roc_curve_dict[particle_input_type][model]
 
-                self.plot_roc_curves(roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, outputdir=self.output_dir_dict[self.particle_input_type_list[0]])
+                    self.plot_roc_curves(roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, outputdir=self.output_dir_dict[self.particle_input_type_list[0]])
 
     #--------------------------------------------------------------- 
     # Plot ROC curves
@@ -171,6 +172,8 @@ class PlotFlavor(common_base.CommonBase):
             for label,value in roc_list.items():
                 if 'pfn' in label:
                     minpt = label.rsplit('_')[2][5:]
+                    if minpt == '0':
+                        minpt = '0.1'
             title += f'      minpt={minpt}'
         if type == 'varied_ptmin':
             for label,value in roc_list.items():
@@ -187,6 +190,8 @@ class PlotFlavor(common_base.CommonBase):
                 input_type = label.rsplit('_')[3]
                 if 'pfn' in label and input_type == 'in':
                     minpt = label.rsplit('_')[2][5:]
+                    if minpt == '0':
+                        minpt = '0.1'
                     if 'charge' in label:
                         title_label = '      w/charge'
                     elif 'nopid' in label:
@@ -263,6 +268,8 @@ class PlotFlavor(common_base.CommonBase):
                 color = sns.xkcd_rgb['almost black']
   
             if type == 'varied_ptmin':
+                if minpt == '0':
+                    minpt = '0.1'
                 label += f', min_pt = {minpt}'
 
             FPR = value[0]
