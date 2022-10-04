@@ -14,6 +14,7 @@ from numba import jit, prange
 import functools
 import shutil
 from collections import defaultdict
+import time
 
 # Data analysis and plotting
 import pandas as pd
@@ -514,7 +515,9 @@ class AnalyzeFlavor(common_base.CommonBase):
 
         # Otherwise group by event, make some modifications to each dataframe, and aggregate back into dataframe
         else:
+            start = time.time()
             jet_df = jet_df.groupby(['event'], as_index=False).apply(self.preprocess_event, particle_input_type).reset_index(drop=True)
+            print(f'time to run preprocess_event(): {time.time()-start}')
 
             # For DIS jets, set jet indices for out-of-jet particles to be the same as the in-jet particles
             if self.event_type == 'dis':
@@ -561,7 +564,7 @@ class AnalyzeFlavor(common_base.CommonBase):
             unique_ids = np.unique(labels)
             sys.exit(f'Unexpected class labels ({set(expected_ids).symmetric_difference(unique_ids)}) found in input file!')
 
-        print(f'class1: {self.classes_class1} ({self.class1_ids}) (ML label 0), class2: {self.classes_class2} ({self.class2_ids}) (ML label 1)')
+        print(f'class1: {self.classes_class1} ({self.class1_ids}) (ML label 0) ({labels.size-np.sum(labels)} entries), class2: {self.classes_class2} ({self.class2_ids}) (ML label 1) ({np.sum(labels)} entries)')
         print()
         #---
 
