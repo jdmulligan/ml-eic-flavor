@@ -1,10 +1,10 @@
-# Config file for uds vs. c jet classification
+# Config file for u vs. d jet classification
 event_type: 'dis'
 classification_type: 'jet'
-classes: 'u_d_s__c' # The double underscore specifies the two classes to consider
+classes: 'u__d' # The double underscore specifies the two classes to consider
 
 jet_pt_min_list: [10]     # Can loop over different min jet pt 
-particle_input: ['in']    # Loop over different sets of input particles: in-jet, out-of-jet, or both
+particle_input: ['out']    # Loop over different sets of input particles: in-jet, out-of-jet, or both
 kappa: [0.3, 0.5, 0.7]
 
 # Train multiple models with different particle min pt (in GeV) (only implemented for PFNs and single jet observables)
@@ -217,9 +217,9 @@ input_files:
  - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221003/199.txt'
 
 # Load labeled data
-n_train: 10000000
-n_val: 2000000
-n_test: 2000000
+n_train: 2500000
+n_val: 500000
+n_test: 500000
 balance_samples: False
 
 # Select model: pfn, efn, efp_linear, efp_lasso, efp_dnn
