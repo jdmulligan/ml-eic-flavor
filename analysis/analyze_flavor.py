@@ -92,10 +92,10 @@ def compute_jet_charge(X_particles, kappa):
 
 #--------------------------------------------------------------- 
 # Compute other jet observables
-# NOTE: np.in1d() is not yet supported in numba, so we allow python mode 
+# NOTE: np.in1d() is not yet supported in numba, so we allow python mode
 #---------------------------------------------------------------        
 @jit(nopython=False)
-def compute_other_jet_observables(X_particles):
+def compute_other_jet_observables(X_particles, compute_multiplicity, compute_strange_tagger):
 
     particle_multiplicity_array = np.zeros(X_particles.shape[0])
     strange_tagger_array = np.zeros(X_particles.shape[0])
@@ -103,17 +103,16 @@ def compute_other_jet_observables(X_particles):
     for i in prange(X_particles.shape[0]):
 
         # Particle multiplicity in jet
-        pid = X_particles[i][:,5]
-        pid_nonzero = pid[ pid != 0]
-        particle_multiplicity = pid_nonzero.size
+        if compute_multiplicity:
+            pid = X_particles[i][:,5]
+            pid_nonzero = pid[ pid != 0]
+            particle_multiplicity_array[i] = pid_nonzero.size
             
         # Compute whether jet has a strange hadron in it
-        strange_particle_pdg = np.array([321, 130, 310, 3222, 3112, 3312, 3322, 3334, 3122, 
-                                         321, -3222, -3112, -3312, -3322, -3334, -3122])
-        found_strange_hadron = np.any(np.in1d(pid_nonzero, strange_particle_pdg))
-        
-        particle_multiplicity_array[i] = particle_multiplicity
-        strange_tagger_array[i] = found_strange_hadron
+        if compute_strange_tagger:
+            strange_particle_pdg = np.array([321, 130, 310, 3222, 3112, 3312, 3322, 3334, 3122, 
+                                             321, -3222, -3112, -3312, -3322, -3334, -3122])
+            strange_tagger_array[i] = np.any(np.in1d(pid_nonzero, strange_particle_pdg))
 
     return particle_multiplicity_array, strange_tagger_array
 
@@ -228,6 +227,8 @@ class AnalyzeFlavor(common_base.CommonBase):
         self.val_frac = 1. * self.n_val / (self.n_train + self.n_val)
         self.balance_samples = config['balance_samples']
 
+        self.compute_multiplicity = False
+        self.compute_strange_tagger = 's' in self.classes_class2
         self.check_properties_of_charge0_jets = False
         
         if 'dmax' in config:
@@ -680,24 +681,21 @@ class AnalyzeFlavor(common_base.CommonBase):
         # For DIS, check that there is only one jet per event
         n_jets = event[event['jet']>0]['jet'].nunique()
         if n_jets != 1:
-            return event[event['jet']>0]
+            if n_jets == 0:
+                return event[event['jet']>0]
+            else:
+                sys.exit("ERROR in preprocess_event() -- more than one jet in DIS event!")
 
-        # If only in-jet particles requested, remove the particles outside the jets
-        if particle_input_type == 'in':
-            event = event[event.jet > 0]
-        
-        # Otherwise, set jetPt and class label for all rows based on the first row
-        else:
+        # Set jetPt and class label for all rows based on the first row
+        event['jetpT'] = event['jetpT'].iloc[0]
+        event['qg'] = event['qg'].iloc[0]
+    
+        # If only out-of-jet particles are requested, remove the jet particles
+        if particle_input_type == 'out':
+            event = event[event.jet < 0]
 
-            event['jetpT'] = event['jetpT'].iloc[0]
-            event['qg'] = event['qg'].iloc[0]
-        
-            # If only out-of-jet particles are requested, remove the jet particles
-            if particle_input_type == 'out':
-                event = event[event.jet < 0]
-
-            # Reset the ct index
-            event['ct'] = range(1, len(event.index)+1)
+        # Reset the ct index
+        event['ct'] = range(1, len(event.index)+1)
 
         return event
 
@@ -712,8 +710,10 @@ class AnalyzeFlavor(common_base.CommonBase):
         self.qa_observables = []
         for particle_pt_min in self.particle_pt_min_list:
             self.qa_observables += [f'jet_charge_ptmin{particle_pt_min}_k{kappa}' for kappa in self.kappa]
-            self.qa_observables += [f'particle_multiplicity_ptmin{particle_pt_min}']
-            self.qa_observables += [f'strange_tagger_ptmin{particle_pt_min}']
+            if self.compute_multiplicity:
+                self.qa_observables += [f'particle_multiplicity_ptmin{particle_pt_min}']
+            if self.compute_strange_tagger:
+                self.qa_observables += [f'strange_tagger_ptmin{particle_pt_min}']
             if self.check_properties_of_charge0_jets:
                 self.qa_observables += [f'jet_charge0_ptmin{particle_pt_min}_k{kappa}_multiplicity' for kappa in self.kappa]
 
@@ -765,9 +765,14 @@ class AnalyzeFlavor(common_base.CommonBase):
         for particle_pt_min in self.particle_pt_min_list:
             print(f'    for jets with particle_pt_min={particle_pt_min}')
 
-            particle_multiplicity_array, strange_tagger_array = compute_other_jet_observables(self.X_particles[f'particle_pt_min{particle_pt_min}'])
-            self.qa_results[f'particle_multiplicity_ptmin{particle_pt_min}'] = particle_multiplicity_array
-            self.qa_results[f'strange_tagger_ptmin{particle_pt_min}'] = strange_tagger_array
+            if self.compute_multiplicity or self.compute_strange_tagger:
+                particle_multiplicity_array, strange_tagger_array = compute_other_jet_observables(self.X_particles[f'particle_pt_min{particle_pt_min}'], 
+                                                                                                  self.compute_multiplicity, self.compute_strange_tagger)
+            
+                if self.compute_multiplicity:
+                    self.qa_results[f'particle_multiplicity_ptmin{particle_pt_min}'] = particle_multiplicity_array
+                if self.compute_strange_tagger:
+                    self.qa_results[f'strange_tagger_ptmin{particle_pt_min}'] = strange_tagger_array
 
         print('Done.')
 
