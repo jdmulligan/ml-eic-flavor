@@ -104,10 +104,11 @@ def compute_other_jet_observables(X_particles, compute_multiplicity, compute_str
     for i in prange(X_particles.shape[0]):
 
         # Particle multiplicity in jet
-        if compute_multiplicity:
+        if compute_multiplicity or compute_strange_tagger:
             pid = X_particles[i][:,5]
             pid_nonzero = pid[ pid != 0]
-            particle_multiplicity_array[i] = pid_nonzero.size
+            if compute_multiplicity:
+                particle_multiplicity_array[i] = pid_nonzero.size
             
         # Compute whether jet has a strange hadron in it
         if compute_strange_tagger:
@@ -682,12 +683,13 @@ class AnalyzeFlavor(common_base.CommonBase):
     def preprocess_event(self, event, particle_input_type):
 
         # For DIS, check that there is only one jet per event
-        n_jets = event[event['jet']>0]['jet'].nunique()
-        if n_jets != 1:
-            if n_jets == 0:
-                return event[event['jet']>0]
-            else:
-                sys.exit("ERROR in preprocess_event() -- more than one jet in DIS event!")
+        #n_jets = event[event['jet']>0]['jet'].nunique()
+        #if n_jets != 1:
+        #    if n_jets == 0:
+        #        #return event[event['jet']>0]
+        #        sys.exit("ERROR in preprocess_event() -- 0 jets in DIS event!")
+        #    else:
+        #        sys.exit("ERROR in preprocess_event() -- more than one jet in DIS event!")
 
         # Set jetPt and class label for all rows based on the first row
         event['jetpT'] = event['jetpT'].iloc[0]
