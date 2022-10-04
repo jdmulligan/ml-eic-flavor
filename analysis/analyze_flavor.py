@@ -30,7 +30,6 @@ import energyflow.archs
 
 # sklearn
 import sklearn
-import sklearn.linear_model
 import sklearn.ensemble
 import sklearn.model_selection
 import sklearn.pipeline
@@ -253,18 +252,6 @@ class AnalyzeFlavor(common_base.CommonBase):
                 self.model_settings[model]['epochs'] = config[model]['epochs']
                 self.model_settings[model]['batch_size'] = config[model]['batch_size']
                 self.model_settings[model]['metrics'] = config[model]['metrics']
-            
-            if 'linear' in model:
-                self.model_settings[model]['sgd_loss'] = config[model]['sgd_loss']
-                self.model_settings[model]['sgd_penalty'] = config[model]['sgd_penalty']
-                self.model_settings[model]['sgd_alpha'] = [float(x) for x in config[model]['sgd_alpha']]
-                self.model_settings[model]['sgd_max_iter'] = config[model]['sgd_max_iter']
-                self.model_settings[model]['sgd_tol'] = [float(x) for x in config[model]['sgd_tol']]
-                self.model_settings[model]['sgd_learning_rate'] = config[model]['sgd_learning_rate']
-                self.model_settings[model]['sgd_early_stopping'] = config[model]['sgd_early_stopping']
-                self.model_settings[model]['n_iter'] = config[model]['n_iter']
-                self.model_settings[model]['cv'] = config[model]['cv']
-                self.model_settings[model]['lda_tol'] = [float(x) for x in config[model]['lda_tol']]
 
             if model == 'pfn':
                 self.model_settings[model]['Phi_sizes'] = tuple(config[model]['Phi_sizes'])
@@ -371,7 +358,7 @@ class AnalyzeFlavor(common_base.CommonBase):
                     self.roc_curve_dict[model] = {}
 
                 # Compute EFPs
-                if 'efp_dnn' in self.models or 'efp_linear' in self.models:
+                if 'efp_dnn' in self.models:
 
                     print()
                     print(f'Calculating d <= {self.dmax} EFPs for {self.n_total} jets... ')
@@ -799,8 +786,6 @@ class AnalyzeFlavor(common_base.CommonBase):
             # EFPs
             if 'efp' in model:
                 for d in range(1, self.dmax+1):
-                    if model == 'efp_linear':
-                        self.fit_efp_linear(model, model_settings, d)
                     if model == 'efp_dnn':
                         self.fit_efp_dnn(model, model_settings, d)
 
@@ -840,22 +825,11 @@ class AnalyzeFlavor(common_base.CommonBase):
                     print(f'Skip constructing ROC curve for observable={observable}, due to mismatch with number of labels')
 
         # Save ROC curves to file
-        if 'nsub_dnn' in self.models or 'efp_dnn' in self.models or 'nsub_linear' in self.models or 'efp_linear' in self.models or 'pfn' in self.models or 'efn' in self.models:
+        if 'nsub_dnn' in self.models or 'efp_dnn' in self.models or 'pfn' in self.models or 'efn' in self.models:
             output_filename = os.path.join(self.output_dir_i, f'ROC{self.key_suffix}.pkl')
             with open(output_filename, 'wb') as f:
                 pickle.dump(self.roc_curve_dict, f)
                 pickle.dump(self.AUC, f)
-
-    #---------------------------------------------------------------
-    # Fit linear model for EFPs
-    #---------------------------------------------------------------
-    def fit_efp_linear(self, model, model_settings, d):
-
-        X_train = self.X_EFP_train[d]
-        X_test = self.X_EFP_test[d]
-        y_train = self.Y_EFP_train[d]
-        y_test = self.Y_EFP_test[d]
-        self.fit_linear_model(X_train, y_train, X_test, y_test, model, model_settings, dim_label='d', dim=d, type='LDA_search')
 
     #---------------------------------------------------------------
     # Fit Dense Neural Network for EFPs
@@ -867,93 +841,6 @@ class AnalyzeFlavor(common_base.CommonBase):
         y_train = self.Y_EFP_train[d]
         y_test = self.Y_EFP_test[d]
         self.fit_dnn(X_train, y_train, X_test, y_test, model, model_settings, dim_label='d', dim=d)
-
-    #---------------------------------------------------------------
-    # Fit ML model -- SGDClassifier or LinearDiscriminant
-    #   - SGDClassifier: Linear model (SVM by default, w/o kernel) with SGD training
-    #   - For best performance, data should have zero mean and unit variance
-    #---------------------------------------------------------------
-    def fit_linear_model(self, X_train, y_train, X_test, y_test, model, model_settings, dim_label='', dim=None, type='SGD'):
-        print(f'Training {model} ({type}), {dim_label}={dim}...')
-        
-        if type == 'SGD':
-        
-            # Define model
-            clf = sklearn.linear_model.SGDClassifier(loss=model_settings['sgd_loss'],
-                                                        max_iter=model_settings['sgd_max_iter'],
-                                                        learning_rate=model_settings['sgd_learning_rate'],
-                                                        early_stopping=model_settings['sgd_early_stopping'],
-                                                        random_state=self.random_state)
-
-            # Optimize hyperparameters with random search, using cross-validation to determine best set
-            # Here we just search over discrete values, although can also easily specify a distribution
-            param_distributions = {'penalty': model_settings['sgd_penalty'],
-                                'alpha': model_settings['sgd_alpha'],
-                                'tol': model_settings['sgd_tol']}
-
-            randomized_search = sklearn.model_selection.RandomizedSearchCV(clf, param_distributions,
-                                                                           n_iter=model_settings['n_iter'],
-                                                                           cv=model_settings['cv'],
-                                                                           random_state=self.random_state)
-            search_result = randomized_search.fit(X_train, y_train)
-            final_model = search_result.best_estimator_
-            result_info = search_result.cv_results_
-            print(f'Best params: {search_result.best_params_}')
-
-            # Get predictions for the test set
-            #y_predict_train = final_model.predict(X_train)
-            #y_predict_test = final_model.predict(X_test)
-            
-            y_predict_train = sklearn.model_selection.cross_val_predict(clf, X_train, y_train, cv=3, method="decision_function")
-            
-            # Compare AUC on train set and test set
-            AUC_train = sklearn.metrics.roc_auc_score(y_train, y_predict_train)
-            print(f'AUC = {AUC_train} (cross-val train set)')
-            print()
-
-            # Compute ROC curve: the roc_curve() function expects labels and scores
-            self.roc_curve_dict[model][dim] = sklearn.metrics.roc_curve(y_train, y_predict_train)
-        
-            # Check number of threhsolds used for ROC curve
-            # print('thresholds: {}'.format(self.roc_curve_dict[model][K][2]))
-            
-            # Plot confusion matrix
-            #self.plot_confusion_matrix(self.y_train, y_predict_train, f'{model}_K{K}')
-
-        elif type == 'LDA':
-
-            # energyflow implementation
-            clf = energyflow.archs.LinearClassifier(linclass_type='lda')
-            history = clf.fit(X_train, y_train)
-            preds_EFP = clf.predict(X_test)        
-            auc_EFP = sklearn.metrics.roc_auc_score(y_test,preds_EFP[:,1])
-            print(f'  AUC = {auc_EFP} (test set)')
-            self.AUC[f'{model}{self.key_suffix}'].append(auc_EFP)
-            self.roc_curve_dict[model][dim] = sklearn.metrics.roc_curve(y_test, preds_EFP[:,1])
-
-        elif type == 'LDA_search':
-
-            # Define model
-            clf = sklearn.discriminant_analysis.LinearDiscriminantAnalysis()
-
-            # Optimize hyperparameters
-            param_distributions = {'tol': model_settings['lda_tol']}
-
-            randomized_search = sklearn.model_selection.GridSearchCV(clf, param_distributions)
-            search_result = randomized_search.fit(X_train, y_train)
-            final_model = search_result.best_estimator_
-            result_info = search_result.cv_results_
-            print(f'Best params: {search_result.best_params_}')
-
-            y_predict_train = sklearn.model_selection.cross_val_predict(clf, X_train, y_train, cv=3, method="decision_function")
-            
-            # Compare AUC on train set and test set
-            AUC_train = sklearn.metrics.roc_auc_score(y_train, y_predict_train)
-            print(f'AUC = {AUC_train} (cross-val train set)')
-            print()
-
-            # Compute ROC curve: the roc_curve() function expects labels and scores
-            self.roc_curve_dict[model][dim] = sklearn.metrics.roc_curve(y_train, y_predict_train)
 
     #---------------------------------------------------------------
     # Train DNN, using hyperparameter optimization with keras tuner
@@ -1300,17 +1187,6 @@ class AnalyzeFlavor(common_base.CommonBase):
         else:
             plt.savefig(os.path.join(self.output_dir_i, f'PFN_epoch_{label}.pdf'))
         plt.close()
-
-    #---------------------------------------------------------------
-    # Plot confusion matrix
-    # Note: not normalized to relative error
-    #---------------------------------------------------------------
-    def plot_confusion_matrix(self, y_train, y_predict_train, label):
-    
-        confusion_matrix = sklearn.metrics.confusion_matrix(y_train, y_predict_train)
-        sns.heatmap(confusion_matrix)
-        plt.savefig(os.path.join(self.output_dir_i, f'confusion_matrix_{label}.pdf'))
-        plt.close()
         
     #---------------------------------------------------------------
     # Plot QA
@@ -1376,39 +1252,6 @@ class AnalyzeFlavor(common_base.CommonBase):
                 plt.tight_layout()
                 plt.savefig(os.path.join(self.output_dir_i, f'{qa_observable}.pdf'))
                 plt.close()
-
-    #---------------------------------------------------------------
-    # Plot q vs. g
-    #---------------------------------------------------------------
-    def plot_observable(self, X, y_train, xlabel='', ylabel='', filename='', xfontsize=12, yfontsize=16, logx=False, logy=False):
-            
-        class1_indices = 1 - y_train
-        class2_indices = y_train
-
-        observable_class1 = X[class1_indices.astype(bool)]
-        observable_class2 = X[class2_indices.astype(bool)]
-
-        df_class1 = pd.DataFrame(observable_class1, columns=[xlabel])
-        df_class2 = pd.DataFrame(observable_class2, columns=[xlabel])
-
-        df_class1['generator'] = np.repeat(self.class1_label, observable_class1.shape[0])
-        df_class2['generator'] = np.repeat(self.class2_label, observable_class2.shape[0])
-        df = df_class1.append(df_class2, ignore_index=True)
-
-        bins = np.linspace(np.amin(X), np.amax(X), 50)
-        stat='density'
-        h = sns.histplot(df, x=xlabel, hue='generator', stat=stat, bins=bins, element='step', common_norm=False, log_scale=[False, logy])
-        if h.legend_:
-            #h.legend_.set_bbox_to_anchor((0.85, 0.85))
-            h.legend_.set_title(None)
-            plt.setp(h.get_legend().get_texts(), fontsize='14') # for legend text
-
-        plt.xlabel(xlabel, fontsize=xfontsize)
-        plt.ylabel(ylabel, fontsize=yfontsize)
-
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir_i, f'{filename}'))
-        plt.close()
 
     #---------------------------------------------------------------
     # Plot EFPs
