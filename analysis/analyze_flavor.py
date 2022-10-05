@@ -228,7 +228,7 @@ class AnalyzeFlavor(common_base.CommonBase):
         self.val_frac = 1. * self.n_val / (self.n_train + self.n_val)
         self.balance_samples = config['balance_samples']
 
-        self.compute_multiplicity = False
+        self.compute_multiplicity = self.event_type == 'photoproduction'
         self.compute_strange_tagger = 's' in self.classes_class2
         self.check_properties_of_charge0_jets = False
         
@@ -348,7 +348,7 @@ class AnalyzeFlavor(common_base.CommonBase):
                         self.X_particles[f'particle_pt_min{particle_pt_min}'] = filter_four_vectors(np.copy(self.X_particles_unfiltered), min_pt=particle_pt_min)
 
                 # Also compute some jet observables
-                if particle_input_type == 'in':
+                if particle_input_type in ['in', 'leading', 'leading+subleading', 'all']:
                     self.compute_jet_observables()
                     self.plot_QA()
 
