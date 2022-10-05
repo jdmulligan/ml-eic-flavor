@@ -40,7 +40,7 @@ class PlotFlavor(common_base.CommonBase):
         self.initialize_config()
 
         # Suffix for plot outputfile names
-        self.roc_plot_index = {'in': 0, 'out': 0, 'in+out': 0}
+        self.roc_plot_index = {type:0 for type in self.reference_particle_input_types}
 
         self.plot_title = True
                 
@@ -53,15 +53,30 @@ class PlotFlavor(common_base.CommonBase):
         with open(self.config_file, 'r') as stream:
           config = yaml.safe_load(stream)
           
-        self.jet_pt_min_list = config['jet_pt_min_list']
+        self.event_type = config['event_type']
+        if self.event_type == 'photoproduction':
+            self.leading_jet_pt_min = config['leading_jet_pt_min']
+            self.subleading_jet_pt_min = config['subleading_jet_pt_min']
+            self.jet_pt_min_list = [self.leading_jet_pt_min]
+        elif self.event_type == 'dis':
+            self.jet_pt_min_list = config['jet_pt_min_list']
+
         self.kappa = config['kappa']
 
-        self.classes = config['classes']
-        class_labels = self.classes.split('__')
-        self.class1_label = class_labels[0]
-        self.class2_label = class_labels[1]
+        if self.event_type == 'photoproduction':
+            self.class1_label = r'$qq/q\bar{q}$'
+            self.class2_label = r'$gg$'
+        elif self.event_type == 'dis':
+            self.classes = config['classes']
+            class_labels = self.classes.split('__')
+            self.class1_label = class_labels[0]
+            self.class2_label = class_labels[1]
 
         self.particle_input_type_list = config['particle_input']
+        if self.event_type == 'photoproduction':
+            self.reference_particle_input_types = ['leading', 'leading+subleading', 'all']
+        elif self.event_type == 'dis':
+            self.reference_particle_input_types = ['in', 'out', 'in+out']
 
         self.particle_pt_min_list = config['particle_pt_min_list']
 
@@ -79,7 +94,7 @@ class PlotFlavor(common_base.CommonBase):
             self.output_dir_dict = {}
             self.roc_curve_dict = {}
             self.AUC_dict = {}
-            for particle_input_type in ['in', 'out', 'in+out']:
+            for particle_input_type in self.reference_particle_input_types:
             
                 # Load ML results from file
                 self.output_dir_dict[particle_input_type] = os.path.join(self.output_dir, f'pt{jet_pt_min}_{particle_input_type}')
@@ -117,9 +132,10 @@ class PlotFlavor(common_base.CommonBase):
                     if model in list(self.roc_curve_dict[particle_input_type].keys()):
                         roc_list[model] = self.roc_curve_dict[particle_input_type][model]
 
-                for kappa in self.kappa:
-                    charge_label = f'jet_charge_ptmin{particle_pt_min}_k{kappa}'
-                    roc_list[charge_label] = self.roc_curve_dict[particle_input_type][charge_label]
+                if self.event_type == 'dis':
+                    for kappa in self.kappa:
+                        charge_label = f'jet_charge_ptmin{particle_pt_min}_k{kappa}'
+                        roc_list[charge_label] = self.roc_curve_dict[particle_input_type][charge_label]
 
                 if self.class2_label == 's':
                     strange_tagger_label = f'strange_tagger_ptmin{particle_pt_min}'
@@ -151,11 +167,12 @@ class PlotFlavor(common_base.CommonBase):
                 for particle_pt_min in self.particle_pt_min_list:
 
                     roc_list = {}
-                    for particle_input_type in ['in', 'out', 'in+out']:
+                    for particle_input_type in self.reference_particle_input_types:
 
                         model = f'pfn_{pfn_label}_minpt{particle_pt_min}'
-                        if model in self.roc_curve_dict[particle_input_type].keys():
-                            roc_list[f'{model}_{particle_input_type}'] = self.roc_curve_dict[particle_input_type][model]
+                        if particle_input_type in self.roc_curve_dict.keys():
+                            if model in self.roc_curve_dict[particle_input_type].keys():
+                                roc_list[f'{model}_{particle_input_type}'] = self.roc_curve_dict[particle_input_type][model]
 
                     self.plot_roc_curves(roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, outputdir=self.output_dir_dict[self.particle_input_type_list[0]])
 
@@ -188,7 +205,7 @@ class PlotFlavor(common_base.CommonBase):
         if type == 'in_vs_out':
             for label,value in roc_list.items():
                 input_type = label.rsplit('_')[3]
-                if 'pfn' in label and input_type == 'in':
+                if 'pfn' in label and input_type in ['in','leading']:
                     minpt = label.rsplit('_')[2][5:]
                     if minpt == '0':
                         minpt = '0.1'
@@ -327,11 +344,11 @@ class PlotFlavor(common_base.CommonBase):
         elif type == 'in_vs_out':
 
             input_type = label.rsplit('_')[3]
-            if input_type == 'in':
+            if input_type in ['in', 'leading']:
                 color = sns.xkcd_rgb['faded purple'] 
-            elif input_type == 'out':
+            elif input_type in ['out', 'leading+subleading']:
                 color = sns.xkcd_rgb['light brown']    
-            elif input_type == 'in+out':
+            elif input_type in ['in+out', 'all']:
                 color = sns.xkcd_rgb['medium brown'] 
             else:
                 color = sns.xkcd_rgb['almost black']

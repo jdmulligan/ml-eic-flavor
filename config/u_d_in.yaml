@@ -1,6 +1,5 @@
 # Config file for u vs. d jet classification
 event_type: 'dis'
-classification_type: 'jet'
 classes: 'u__d' # The double underscore specifies the two classes to consider
 
 jet_pt_min_list: [10]     # Can loop over different min jet pt 

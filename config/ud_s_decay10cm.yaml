@@ -1,0 +1,267 @@
+# Config file for ud vs. s jet classification
+event_type: 'dis'
+classes: 'u_d__s' # The double underscore specifies the two classes to consider
+
+jet_pt_min_list: [10]     # Can loop over different min jet pt 
+particle_input: ['in']    # Loop over different sets of input particles: in-jet, out-of-jet, or both
+kappa: [0.3, 0.5, 0.7]
+
+# Train multiple models with different particle min pt (in GeV) (only implemented for PFNs and single jet observables)
+particle_pt_min_list: [0, 0.2, 0.4]
+
+decay_strange: True
+
+# Input files of training data
+# 200 files, 1M DIS events each
+# Rough flavor proportions -- 1s : 2c : 5d : 25u
+input_files:
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/0.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/1.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/2.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/3.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/4.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/5.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/6.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/7.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/8.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/9.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/10.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/11.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/12.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/13.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/14.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/15.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/16.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/17.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/18.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/19.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/20.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/21.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/22.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/23.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/24.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/25.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/26.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/27.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/28.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/29.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/30.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/31.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/32.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/33.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/34.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/35.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/36.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/37.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/38.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/39.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/40.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/41.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/42.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/43.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/44.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/45.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/46.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/47.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/48.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/49.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/50.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/51.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/52.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/53.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/54.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/55.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/56.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/57.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/58.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/59.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/60.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/61.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/62.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/63.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/64.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/65.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/66.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/67.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/68.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/69.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/70.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/71.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/72.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/73.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/74.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/75.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/76.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/77.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/78.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/79.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/80.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/81.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/82.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/83.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/84.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/85.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/86.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/87.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/88.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/89.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/90.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/91.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/92.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/93.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/94.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/95.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/96.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/97.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/98.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/99.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/100.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/101.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/102.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/103.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/104.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/105.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/106.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/107.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/108.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/109.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/110.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/111.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/112.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/113.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/114.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/115.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/116.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/117.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/118.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/119.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/120.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/121.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/122.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/123.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/124.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/125.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/126.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/127.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/128.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/129.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/130.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/131.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/132.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/133.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/134.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/135.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/136.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/137.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/138.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/139.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/140.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/141.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/142.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/143.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/144.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/145.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/146.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/147.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/148.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/149.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/150.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/151.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/152.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/153.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/154.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/155.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/156.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/157.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/158.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/159.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/160.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/161.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/162.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/163.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/164.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/165.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/166.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/167.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/168.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/169.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/170.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/171.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/172.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/173.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/174.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/175.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/176.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/177.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/178.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/179.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/180.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/181.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/182.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/183.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/184.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/185.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/186.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/187.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/188.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/189.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/190.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/191.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/192.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/193.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/194.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/195.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/196.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/197.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/198.txt'
+ - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/199.txt'
+
+# Load labeled data
+n_train: 10000000
+n_val: 2000000
+n_test: 2000000
+balance_samples: False
+
+# Select model: pfn, efn, efp_linear, efp_lasso, efp_dnn
+models: [pfn]
+
+# efp parameters
+dmax: 5                                             # maximal degree of the EFPs
+efp_measure: 'hadr'                                 # 
+efp_beta: 0.5                                       # Exponent of the pairwise distance
+
+efp_dnn:                    
+
+    learning_rate: [0.1, 0.01, 1.e-3, 1.e-4]    # (0.0001 cf 1810.05165)
+    loss: 'binary_crossentropy'                     # loss function - use categorical_crossentropy instead ?
+    metrics: ['accuracy']                           # measure accuracy during training
+    batch_size: 1000                    
+    epochs: 10                                      # number of training epochs
+
+pfn:
+
+    # Network architecture parameters
+    Phi_sizes: [100, 100, 256]
+    F_sizes: [100, 100, 100]
+    #Phi_sizes: [200, 200, 200, 200, 512]
+    #F_sizes: [200, 200, 200, 200, 200, 200]
+
+    # Network training parameters
+    epochs: 10
+    batch_size: 500
+
+    # Train PFNs for each of the following options
+    pid: True
+    nopid: True      
+    charge: True
+    
+efn:
+
+    # Network architecture parameters
+    Phi_sizes: [100, 100, 256]
+    F_sizes: [100, 100, 100]
+
+    # Network training parameters
+    learning_rate: 0.001
+    epochs: 10
+    batch_size: 500
