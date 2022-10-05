@@ -125,7 +125,10 @@ class PlotFlavor(common_base.CommonBase):
                 pfn_charge_label = f'pfn_charge_minpt{particle_pt_min}'
                 pfn_pid_label = f'pfn_pid_minpt{particle_pt_min}'
                 pfn_nopid_label = f'pfn_nopid_minpt{particle_pt_min}'
-                models = [pfn_charge_label, pfn_pid_label, pfn_nopid_label]
+                if 'direct_resolved' in self.config_file:
+                    models = [pfn_pid_label, pfn_nopid_label]
+                else:
+                    models = [pfn_charge_label, pfn_pid_label, pfn_nopid_label]
 
                 roc_list = {}
                 for model in models:
@@ -277,7 +280,9 @@ class PlotFlavor(common_base.CommonBase):
                             label = 'in-jet                   '
                         elif input_type == 'in+out':
                             label = f'in-jet + out-of-jet'
-                        label += rf'   $(p_{{T,\mathrm{{particle}}}}>{minpt})$'
+                        if minpt == '0':
+                            minpt = '0.1'
+                        label += rf'   ($p_{{T,\mathrm{{particle}}}}>{minpt}$ GeV)'
                     else:
                         if 'charge' in label:
                             label = 'Particle Flow Network'
@@ -285,7 +290,15 @@ class PlotFlavor(common_base.CommonBase):
                             label = 'Particle Flow Network'
                         elif 'pid' in label:
                             label = 'Particle Flow Network'
-                        label += f', {input_type}'
+
+                        if input_type == 'leading':
+                            label = f'Leading jet'
+                        elif input_type == 'leading+subleading':
+                            label = f'Leading jet + subleading jet'
+                        elif input_type == 'all':
+                            label = rf'All jets with $p_{{T,\mathrm{{jet}}}}>2$ GeV'
+                        else:
+                            label += f', {input_type}'
                 else:
                     label = 'Particle Flow Network'
 
@@ -323,7 +336,7 @@ class PlotFlavor(common_base.CommonBase):
             if type == 'varied_ptmin':
                 if minpt == '0':
                     minpt = '0.1'
-                label += f', min_pt = {minpt}'
+                label += rf'   ($p_{{T,\mathrm{{particle}}}}>{minpt}$ GeV)'
 
             FPR = value[0]
             TPR = value[1]
