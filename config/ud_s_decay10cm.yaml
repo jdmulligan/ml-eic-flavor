@@ -217,9 +217,9 @@ input_files:
  - '/global/cfs/cdirs/alice/jdmull/ml-eic-flavor/uds/20221004_decay10cm/199.txt'
 
 # Load labeled data
-n_train: 10000000
-n_val: 2000000
-n_test: 2000000
+n_train: 7500000
+n_val: 1500000
+n_test: 1500000
 balance_samples: False
 
 # Select model: pfn, efn, efp_linear, efp_lasso, efp_dnn
