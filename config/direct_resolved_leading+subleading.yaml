@@ -2,7 +2,7 @@
 event_type: 'photoproduction'
 classes: 'transverse QCDC_longitudinal QCDC_transverse PGF_longitudinal PGF__qq --> qq_qqbar --> qqbar_qqbar --> gg_gg --> qqbar_gg --> gg_qg --> qg' # The double underscore specifies the two classes to consider
 
-leading_jet_pt_min: 10.
+leading_jet_pt_min: 8.
 subleading_jet_pt_min: 5. 
 particle_input: ['leading+subleading']    # Loop over different sets of input particles: leading jet, leading+subleading jets, all particles
 kappa: [0.3, 0.5, 0.7]
