@@ -176,10 +176,30 @@ class PlotFlavor(common_base.CommonBase):
 
                     self.plot_roc_curves(roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, outputdir=self.output_dir_dict[self.particle_input_type_list[0]])
 
+        #--------------------------
+        # Plot overlay of different minpt constituent cuts for all possible particle_input_types in a single plot
+        type = 'in_vs_out'
+        pfn_labels = ['charge', 'pid', 'nopid']
+        if len(list(self.roc_curve_dict.keys())) > 1:
+            for pfn_label in pfn_labels:
+
+                roc_list = {}
+                for particle_pt_min in ['0', '0.4']:
+                    for particle_input_type in self.reference_particle_input_types:
+                        if particle_input_type == 'out':
+                            continue
+
+                        model = f'pfn_{pfn_label}_minpt{particle_pt_min}'
+                        if particle_input_type in self.roc_curve_dict.keys():
+                            if model in self.roc_curve_dict[particle_input_type].keys():
+                                roc_list[f'{model}_{particle_input_type}'] = self.roc_curve_dict[particle_input_type][model]
+
+                self.plot_roc_curves(roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, in_vs_out_overlay=True, outputdir=self.output_dir_dict[self.particle_input_type_list[0]])
+
     #--------------------------------------------------------------- 
     # Plot ROC curves
     #--------------------------------------------------------------- 
-    def plot_roc_curves(self, roc_list, jet_pt_min, particle_input_type, type='', outputdir=''):
+    def plot_roc_curves(self, roc_list, jet_pt_min, particle_input_type, type='', in_vs_out_overlay=False, outputdir=''):
     
         plt.plot([0, 1], [0, 1], 'k--') # dashed diagonal
         plt.axis([0, 1, 0, 1])
@@ -207,6 +227,8 @@ class PlotFlavor(common_base.CommonBase):
                 input_type = label.rsplit('_')[3]
                 if 'pfn' in label and input_type in ['in','leading']:
                     minpt = label.rsplit('_')[2][5:]
+                    if in_vs_out_overlay and minpt == '0':
+                        continue
                     if minpt == '0':
                         minpt = '0.1'
                     if 'charge' in label:
@@ -215,7 +237,8 @@ class PlotFlavor(common_base.CommonBase):
                         title_label = '      w/o PID'
                     elif 'pid' in label:
                         title_label = '      w/PID'
-                    title_label += f'      minpt={minpt}'
+                    if not in_vs_out_overlay:
+                        title_label += f'      minpt={minpt}'
                     title += title_label
         if self.plot_title:
             plt.title(title, fontsize=14)
@@ -227,12 +250,18 @@ class PlotFlavor(common_base.CommonBase):
         for label,value in roc_list.items():
             index=0
             if 'pfn' in label:
-                linewidth = 4
-                alpha = 0.5
 
                 minpt = label.rsplit('_')[2][5:]
                 color=self.color(label, particle_pt_min=minpt, type=type)
                 linestyle = self.linestyle(label)
+
+                if in_vs_out_overlay and minpt == '0.4':
+                    linewidth = 2
+                    alpha = 1
+                    linestyle = 'dotted'
+                else:
+                    linewidth = 4
+                    alpha = 0.5
 
                 if type == 'fixed_ptmin':
                     if 'charge' in label:
@@ -243,13 +272,20 @@ class PlotFlavor(common_base.CommonBase):
                         label = 'Particle Flow Network (w/ PID)'
                 elif type == 'in_vs_out':
                     input_type = label.rsplit('_')[3]
-                    if 'charge' in label:
-                        label = 'Particle Flow Network'
-                    elif 'nopid' in label:
-                        label = 'Particle Flow Network'
-                    elif 'pid' in label:
-                        label = 'Particle Flow Network'
-                    label += f', {input_type}'
+                    if in_vs_out_overlay:
+                        if input_type == 'in':
+                            label = 'in-jet                   '
+                        elif input_type == 'in+out':
+                            label = f'in-jet + out-of-jet'
+                        label += rf'   $(p_{{T,\mathrm{{particle}}}}>{minpt})$'
+                    else:
+                        if 'charge' in label:
+                            label = 'Particle Flow Network'
+                        elif 'nopid' in label:
+                            label = 'Particle Flow Network'
+                        elif 'pid' in label:
+                            label = 'Particle Flow Network'
+                        label += f', {input_type}'
                 else:
                     label = 'Particle Flow Network'
 
