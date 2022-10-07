@@ -328,7 +328,8 @@ class PlotFlavor(common_base.CommonBase):
 
                 minpt = label.rsplit('_')[2][4:]
                 color=self.color(label, particle_pt_min=minpt, type=type)
-                linestyle = self.linestyle(label)
+                linestyle = 'solid'
+                label = 'Leading strange tagger'
 
             else:
                 linewidth = 2
