@@ -92,9 +92,8 @@ def compute_jet_charge(X_particles, kappa):
 
 #--------------------------------------------------------------- 
 # Compute other jet observables
-# NOTE: np.in1d() is not yet supported in numba, so we allow python mode
 #---------------------------------------------------------------        
-@jit(nopython=False)
+@jit(nopython=True)
 def compute_other_jet_observables(X_particles, compute_multiplicity, compute_strange_tagger):
 
     particle_multiplicity_array = np.zeros(X_particles.shape[0])
@@ -109,11 +108,11 @@ def compute_other_jet_observables(X_particles, compute_multiplicity, compute_str
             if compute_multiplicity:
                 particle_multiplicity_array[i] = pid_nonzero.size
             
-        # Compute whether jet has a strange hadron in it
+        # Compute whether leading particle in jet has a strange hadron in it
         if compute_strange_tagger:
             strange_particle_pdg = np.array([321, 130, 310, 3222, 3112, 3312, 3322, 3334, 3122, 
-                                             321, -3222, -3112, -3312, -3322, -3334, -3122])
-            strange_tagger_array[i] = np.any(np.in1d(pid_nonzero, strange_particle_pdg))
+                                             -321, -3222, -3112, -3312, -3322, -3334, -3122])
+            strange_tagger_array[i] = pid[np.argmax(X_particles[i][:,0])] in strange_particle_pdg
 
     return particle_multiplicity_array, strange_tagger_array
 
