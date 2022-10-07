@@ -125,8 +125,11 @@ class PlotFlavor(common_base.CommonBase):
                 pfn_charge_label = f'pfn_charge_minpt{particle_pt_min}'
                 pfn_pid_label = f'pfn_pid_minpt{particle_pt_min}'
                 pfn_nopid_label = f'pfn_nopid_minpt{particle_pt_min}'
+                pfn_mass_label = f'pfn_mass_minpt{particle_pt_min}'
                 if 'direct_resolved' in self.config_file:
                     models = [pfn_pid_label, pfn_nopid_label]
+                elif '_s' in self.config_file:
+                    models = [pfn_charge_label, pfn_pid_label, pfn_nopid_label, pfn_mass_label]
                 else:
                     models = [pfn_charge_label, pfn_pid_label, pfn_nopid_label]
 

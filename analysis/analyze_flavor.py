@@ -260,7 +260,8 @@ class AnalyzeFlavor(common_base.CommonBase):
                 self.model_settings[model]['pid'] = config[model]['pid']
                 self.model_settings[model]['nopid'] = config[model]['nopid']
                 self.model_settings[model]['charge'] = config[model]['charge']
-                
+                self.model_settings[model]['mass'] = config[model]['mass']
+
             if model == 'efn':
                 self.model_settings[model]['Phi_sizes'] = tuple(config[model]['Phi_sizes'])
                 self.model_settings[model]['F_sizes'] = tuple(config[model]['F_sizes'])
@@ -814,6 +815,11 @@ class AnalyzeFlavor(common_base.CommonBase):
                         self.AUC[f'{model_label}{self.key_suffix}'] = []
                         self.fit_pfn(model_label, model_settings, self.y, self.X_particles[f'particle_pt_min{particle_pt_min}'], pid=False, charge=True)
                 
+                    if model_settings['mass']:
+                        model_label = f'pfn_mass_minpt{particle_pt_min}'
+                        self.AUC[f'{model_label}{self.key_suffix}'] = []
+                        self.fit_pfn(model_label, model_settings, self.y, self.X_particles[f'particle_pt_min{particle_pt_min}'], mass=True)
+
             if model == 'efn':
                 self.fit_efn(model, model_settings)
 
@@ -929,7 +935,7 @@ class AnalyzeFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     # Fit ML model -- Deep Set/Particle Flow Networks
     #---------------------------------------------------------------
-    def fit_pfn(self, model, model_settings, y, X_particles, pid=False, charge=False):
+    def fit_pfn(self, model, model_settings, y, X_particles, pid=False, charge=False, mass=False):
         print(f'  Fit PFN for {model}')
     
         # Convert labels to categorical
@@ -938,6 +944,8 @@ class AnalyzeFlavor(common_base.CommonBase):
         # (pt, z, eta, phi, m, pid, charge)
         if charge:
             X_PFN = X_particles[:,:,[1,2,3,6]]
+        elif mass:
+            X_PFN = X_particles[:,:,[1,2,3,4]]
         else:
             X_PFN = X_particles[:,:,[1,2,3,5]]
 
