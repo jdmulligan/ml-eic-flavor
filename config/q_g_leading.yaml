@@ -12,7 +12,7 @@ particle_pt_min_list: [0, 0.2, 0.4]
 
 # Input files of training data
 #
-# 20220926: 2B events, with 6M jets for 5 GeV leading jet pt cut
+# 20221007: 20B events, with 60M jets for 5 GeV leading jet pt cut
 #     Notes:
 #       - Require the leading jet to have pT > 5 GeV
 #       - Find up to three jets with pT cuts for the second and third leading jet to be > 2 GeV, in order to allow us to make cuts to select good two-jet events
@@ -2030,17 +2030,34 @@ n_val: 200000
 n_test: 200000
 balance_samples: False
 
-# Select model: pfn, efn, efp_linear, efp_lasso, efp_dnn
-models: [pfn, efn]
+# Select model: pfn, efn, efp_linear, efp_dnn
+models: [pfn, efn, efp_linear, efp_dnn]
 
 # efp parameters
-dmax: 5                                             # maximal degree of the EFPs
+dmax: 6                                             # maximal degree of the EFPs
 efp_measure: 'hadr'                                 # 
 efp_beta: 0.5                                       # Exponent of the pairwise distance
 
+efp_linear:
+
+    # Model hyperparameters -- SGDClassifier
+    sgd_loss: 'hinge'                               # cost function
+    sgd_penalty: ['l2', 'l1']                       # regularization term
+    sgd_alpha: [1e-5, 1e-4, 1e-3]                   # regularization strength
+    sgd_max_iter: 1000                              # max number of epochs
+    sgd_tol: [1e-5, 1e-4, 1e-3]                     # criteria to stop training
+    sgd_learning_rate: 'optimal'                    # learning schedule (learning rate decreases over time in proportion to alpha)
+    sgd_early_stopping: False                       # whether to stop training based on validation score
+
+    lda_tol: [1e-6, 1e-5, 1e-4, 1e-3, 5e-3]         # criteria to stop training
+
+    # Hyperparameter tuning
+    n_iter: 10                                      # number of random hyperparameter sets to try
+    cv: 5                                           # number of cross-validation folds
+
 efp_dnn:                    
 
-    learning_rate: [0.1, 0.01, 1.e-3, 1.e-4]    # (0.0001 cf 1810.05165)
+    learning_rate: [0.1, 0.01, 1.e-3, 1.e-4]        # (0.0001 cf 1810.05165)
     loss: 'binary_crossentropy'                     # loss function - use categorical_crossentropy instead ?
     metrics: ['accuracy']                           # measure accuracy during training
     batch_size: 1000                    

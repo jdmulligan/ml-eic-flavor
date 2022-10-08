@@ -12,7 +12,7 @@ particle_pt_min_list: [0, 0.2, 0.4]
 
 # Input files of training data
 #
-# 20220926: 2B events, with 6M jets for 5 GeV leading jet pt cut
+# 20221007: 20B events, with 60M jets for 5 GeV leading jet pt cut
 #     Notes:
 #       - Require the leading jet to have pT > 5 GeV
 #       - Find up to three jets with pT cuts for the second and third leading jet to be > 2 GeV, in order to allow us to make cuts to select good two-jet events

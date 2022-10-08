@@ -65,6 +65,8 @@ class PlotFlavor(common_base.CommonBase):
             self.jet_pt_min_list = config['jet_pt_min_list']
 
         self.kappa = config['kappa']
+        if 'dmax' in config:
+            self.dmax = config['dmax']
 
         if self.event_type == 'photoproduction':
             self.class1_label = r'$qq/q\bar{q}$'
@@ -170,7 +172,9 @@ class PlotFlavor(common_base.CommonBase):
                     strange_tagger_label = f'strange_tagger_ptmin{particle_pt_min}'
                     roc_list[strange_tagger_label] = results[particle_input_type][strange_tagger_label]
 
-                self.plot_roc_curves(metric, roc_list, jet_pt_min, particle_input_type, type=type, outputdir=self.output_dir_dict[particle_input_type], positive_label=positive_label)
+                if len(list(roc_list.keys())) > 1:
+                    print('Plotting pid vs. charge vs. nopid for each particle_pt_min...')
+                    self.plot_roc_curves(metric, roc_list, jet_pt_min, particle_input_type, type=type, outputdir=self.output_dir_dict[particle_input_type], positive_label=positive_label)
 
             # Plot all particle_pt_min for either pid/charge/nopid
             type='varied_ptmin'
@@ -185,13 +189,16 @@ class PlotFlavor(common_base.CommonBase):
                     if model in results[particle_input_type].keys():
                         roc_list[model] = results[particle_input_type][model]
 
-                self.plot_roc_curves(metric, roc_list, jet_pt_min, particle_input_type, type=type, outputdir=self.output_dir_dict[particle_input_type], positive_label=positive_label)
+                if len(list(roc_list.keys())) > 1:
+                    print('Plotting all particle_pt_min for either pid/charge/nopid...')
+                    self.plot_roc_curves(metric, roc_list, jet_pt_min, particle_input_type, type=type, outputdir=self.output_dir_dict[particle_input_type], positive_label=positive_label)
 
         #--------------------------
         # Plot combination of all possible particle_input_types in a single plot
         type = 'in_vs_out'
         pfn_labels = ['charge', 'pid', 'nopid']
         if len(list(self.roc_curve_dict.keys())) > 1:
+            print('Plotting combination of all possible particle_input_types in a single plot...')
             for pfn_label in pfn_labels:
                 for particle_pt_min in self.particle_pt_min_list:
 
@@ -210,6 +217,7 @@ class PlotFlavor(common_base.CommonBase):
         type = 'in_vs_out'
         pfn_labels = ['charge', 'pid', 'nopid']
         if len(list(self.roc_curve_dict.keys())) > 1:
+            print('Plotting overlay of different minpt constituent cuts for all possible particle_input_types in a single plot...')
             for pfn_label in pfn_labels:
 
                 roc_list = {}
@@ -226,8 +234,9 @@ class PlotFlavor(common_base.CommonBase):
                 self.plot_roc_curves(metric, roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, in_vs_out_overlay=True, outputdir=self.output_dir_dict[self.particle_input_type_list[0]], positive_label=positive_label)
 
         #--------------------------
-        # Plot q/g (photoproduction w/leading jet): PFN, EFN, mass
+        # Plot q/g (photoproduction w/leading jet): PFN, EFN, EFPs, mass
         if self.event_type == 'photoproduction' and self.particle_input_type_list[0] == 'leading':
+            print('Plotting q/g (photoproduction w/leading jet): PFN, EFN, EFPs, mass...')
 
             type = 'fixed_ptmin'
             for particle_pt_min in self.particle_pt_min_list:
@@ -244,13 +253,20 @@ class PlotFlavor(common_base.CommonBase):
                     if model in list(results[self.particle_input_type_list[0]].keys()):
                         roc_list[model] = results[self.particle_input_type_list[0]][model]
 
+                if particle_pt_min == 0:
+                    for d in range(3, self.dmax+1):
+                        efp_linear_label = f'efp_linear_minpt0_d{d}'
+                        efp_dnn_label = f'efp_dnn_minpt0_d{d}'
+                        roc_list[efp_linear_label] = results[self.particle_input_type_list[0]]['efp_linear_minpt0'][d]
+                        roc_list[efp_dnn_label] = results[self.particle_input_type_list[0]]['efp_dnn_minpt0'][d]
+
                 self.plot_roc_curves(metric, roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, outputdir=self.output_dir_dict[particle_input_type], positive_label=positive_label)
 
     #--------------------------------------------------------------- 
     # Plot ROC curves
     #--------------------------------------------------------------- 
     def plot_roc_curves(self, metric, roc_list, jet_pt_min, particle_input_type, type='', in_vs_out_overlay=False, outputdir='', positive_label=''):
-    
+
         if metric == 'ROC':
             plt.axis([0, 1, 0, 1])
             plt.plot([0, 1], [0, 1], 'k--') # dashed diagonal
@@ -274,6 +290,8 @@ class PlotFlavor(common_base.CommonBase):
                     minpt = label.rsplit('_')[2][5:]
                     if minpt == '0':
                         minpt = '0.1'
+                elif 'efp' in label:
+                    minpt = '0.1'
             title += f'      minpt={minpt}'
         if type == 'varied_ptmin':
             for label,value in roc_list.items():
@@ -382,6 +400,23 @@ class PlotFlavor(common_base.CommonBase):
 
                 label = 'Energy Flow Network'
 
+            elif 'efp' in label:
+
+                minpt = label.rsplit('_')[1][5:]
+                d = label.rsplit('_')[3][1:]
+                color=self.color(label, particle_pt_min=minpt, type=type, d=d)
+
+                if 'efp_linear' in label:
+                    linestyle = 'solid'
+                    linewidth = 2
+                    alpha = 1.
+                    label = rf'Energy Flow Polynomials (Linear), $d={d}$'
+                elif 'efp_dnn' in label:
+                    linestyle = 'dashed'
+                    linewidth = 4
+                    alpha = 0.5
+                    label = rf'Energy Flow Polynomials (DNN), $d={d}$'
+
             elif 'jet_charge' in label:
                 linewidth = 4
                 alpha = 0.5
@@ -456,7 +491,7 @@ class PlotFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     # Get color for a given label
     #---------------------------------------------------------------
-    def color(self, label, particle_pt_min=None, kappa=None, type=type):
+    def color(self, label, particle_pt_min=None, kappa=None, d=None, type=type):
 
         color = None
 
@@ -469,7 +504,14 @@ class PlotFlavor(common_base.CommonBase):
             elif 'pfn_nopid' in label:
                 color = sns.xkcd_rgb['faded red'] 
             elif 'efn' in label:
-                color = sns.xkcd_rgb['light brown'] 
+                color = sns.xkcd_rgb['medium green']
+            elif 'efp' in label:
+                if d == '3':
+                    color = sns.xkcd_rgb['watermelon'] 
+                if d == '4':
+                    color = sns.xkcd_rgb['light brown'] 
+                if d == '5':
+                    color = sns.xkcd_rgb['medium brown']
             elif 'strange_tagger' in label:
                 color = sns.xkcd_rgb['medium green']  
             elif 'jet_charge' in label:
@@ -480,7 +522,7 @@ class PlotFlavor(common_base.CommonBase):
                 if kappa == '0.7':
                     color = sns.xkcd_rgb['medium brown']
             elif 'jet_mass' in label:
-                color = sns.xkcd_rgb['watermelon'] 
+                color = sns.xkcd_rgb['lavender'] 
             else:
                 color = sns.xkcd_rgb['almost black']
 

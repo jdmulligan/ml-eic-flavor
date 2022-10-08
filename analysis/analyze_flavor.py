@@ -30,6 +30,7 @@ import energyflow.archs
 
 # sklearn
 import sklearn
+import sklearn.linear_model
 import sklearn.ensemble
 import sklearn.model_selection
 import sklearn.pipeline
@@ -259,6 +260,18 @@ class AnalyzeFlavor(common_base.CommonBase):
         self.model_settings = {}
         for model in self.models:
             self.model_settings[model] = {}
+
+            if 'linear' in model:
+                 self.model_settings[model]['sgd_loss'] = config[model]['sgd_loss']
+                 self.model_settings[model]['sgd_penalty'] = config[model]['sgd_penalty']
+                 self.model_settings[model]['sgd_alpha'] = [float(x) for x in config[model]['sgd_alpha']]
+                 self.model_settings[model]['sgd_max_iter'] = config[model]['sgd_max_iter']
+                 self.model_settings[model]['sgd_tol'] = [float(x) for x in config[model]['sgd_tol']]
+                 self.model_settings[model]['sgd_learning_rate'] = config[model]['sgd_learning_rate']
+                 self.model_settings[model]['sgd_early_stopping'] = config[model]['sgd_early_stopping']
+                 self.model_settings[model]['n_iter'] = config[model]['n_iter']
+                 self.model_settings[model]['cv'] = config[model]['cv']
+                 self.model_settings[model]['lda_tol'] = [float(x) for x in config[model]['lda_tol']]
             
             if 'dnn' in model:
                 self.model_settings[model]['loss'] = config[model]['loss']
@@ -361,9 +374,8 @@ class AnalyzeFlavor(common_base.CommonBase):
                 print(f'    y_shuffled shape: {self.y.shape}')
 
                 # Create additional sets of four-vectors in which a min-pt cut is applied -- the labels can stay the same
-                if 'pfn' in self.models:
-                    for particle_pt_min in self.particle_pt_min_list:
-                        self.X_particles[f'particle_pt_min{particle_pt_min}'] = filter_four_vectors(np.copy(self.X_particles_unfiltered), min_pt=particle_pt_min)
+                for particle_pt_min in self.particle_pt_min_list:
+                    self.X_particles[f'particle_pt_min{particle_pt_min}'] = filter_four_vectors(np.copy(self.X_particles_unfiltered), min_pt=particle_pt_min)
 
                 # Also compute some jet observables
                 if particle_input_type in ['in', 'leading']:
@@ -373,14 +385,9 @@ class AnalyzeFlavor(common_base.CommonBase):
                 # Set up dict to store roc curves
                 self.roc_curve_dict = {'positive_label0': {}, 'positive_label1': {}}
                 self.precision_recall_dict = {'positive_label0': {}, 'positive_label1': {}}
-                for model in self.models:
-                    self.roc_curve_dict['positive_label0'][model] = {}
-                    self.roc_curve_dict['positive_label1'][model] = {}
-                    self.precision_recall_dict['positive_label0'][model] = {}
-                    self.precision_recall_dict['positive_label1'][model] = {}
 
                 # Compute EFPs
-                if 'efp_dnn' in self.models:
+                if 'efp_dnn' in self.models or 'efp_linear' in self.models:
 
                     print()
                     print(f'Calculating d <= {self.dmax} EFPs for {self.n_total} jets... ')
@@ -392,7 +399,7 @@ class AnalyzeFlavor(common_base.CommonBase):
                     # Load labels and data, four vectors. Format: (pT,y,phi,m). 
                     # Note: no PID yet which would be 5th entry... check later!
                     # To make sure, don't need any further preprocessing like for EFNs?
-                    X_EFP = self.X_particles['particle_pt_min0'][:,:,:4] # Remove pid,charge from self.X_particles
+                    X_EFP = self.X_particles['particle_pt_min0'][:,:,[0,2,3,4]] # (pt, eta, phi, m)
                     Y_EFP = self.y #Note not "to_categorical" here... 
         
                     # Switch here to Jesse's quark/gluon data set.
@@ -809,16 +816,29 @@ class AnalyzeFlavor(common_base.CommonBase):
         for model in self.models:
             print()
         
-            # Dict to store AUC
-            self.AUC[f'{model}{self.key_suffix}'] = []
-        
             model_settings = self.model_settings[model]
 
             # EFPs
             if 'efp' in model:
+
+                model_label = f'{model}_minpt0'
+                self.roc_curve_dict['positive_label0'][model_label] = {}
+                self.roc_curve_dict['positive_label1'][model_label] = {}
+                self.precision_recall_dict['positive_label0'][model_label] = {}
+                self.precision_recall_dict['positive_label1'][model_label] = {}
+                self.AUC[f'{model_label}{self.key_suffix}'] = []
+
+                print(self.roc_curve_dict.keys())
+
                 for d in range(1, self.dmax+1):
+
+                    if model == 'efp_linear':
+                        print(f'Fitting EFP Linear Model (d={d}) for particle_pt_min=0')
+                        self.fit_efp_linear(model_label, model_settings, d)
+
                     if model == 'efp_dnn':
-                        self.fit_efp_dnn(model, model_settings, d)
+                        print(f'Fitting EFP DNN (d={d}) for particle_pt_min=0')
+                        self.fit_efp_dnn(model_label, model_settings, d)
 
             # Deep sets
             if model == 'pfn':
@@ -879,13 +899,24 @@ class AnalyzeFlavor(common_base.CommonBase):
         print(f'class_count_dict: {class_count_dict}')
         
         # Save ROC curves to file
-        if 'nsub_dnn' in self.models or 'efp_dnn' in self.models or 'pfn' in self.models or 'efn' in self.models:
+        if 'efp_linear' in self.models or 'efp_dnn' in self.models or 'pfn' in self.models or 'efn' in self.models:
             output_filename = os.path.join(self.output_dir_i, f'ROC{self.key_suffix}.pkl')
             with open(output_filename, 'wb') as f:
                 pickle.dump(self.roc_curve_dict, f)
                 pickle.dump(self.precision_recall_dict, f)
                 pickle.dump(self.AUC, f)
                 pickle.dump(class_count_dict, f)
+
+    #---------------------------------------------------------------
+    # Fit linear model for EFPs
+    #---------------------------------------------------------------
+    def fit_efp_linear(self, model, model_settings, d):
+
+         X_train = self.X_EFP_train[d]
+         X_test = self.X_EFP_test[d]
+         y_train = self.Y_EFP_train[d]
+         y_test = self.Y_EFP_test[d]
+         self.fit_linear_model(X_train, y_train, X_test, y_test, model, model_settings, dim_label='d', dim=d, type='LDA_search')
 
     #---------------------------------------------------------------
     # Fit Dense Neural Network for EFPs
@@ -897,6 +928,96 @@ class AnalyzeFlavor(common_base.CommonBase):
         y_train = self.Y_EFP_train[d]
         y_test = self.Y_EFP_test[d]
         self.fit_dnn(X_train, y_train, X_test, y_test, model, model_settings, dim_label='d', dim=d)
+
+    #---------------------------------------------------------------
+    # Fit ML model -- SGDClassifier or LinearDiscriminant
+    #   - SGDClassifier: Linear model (SVM by default, w/o kernel) with SGD training
+    #   - For best performance, data should have zero mean and unit variance
+    #---------------------------------------------------------------
+    def fit_linear_model(self, X_train, y_train, X_test, y_test, model, model_settings, dim_label='', dim=None, type='SGD'):
+        print(f'Training {model} ({type}), {dim_label}={dim}...')
+
+        if type == 'SGD':
+
+            # Define model
+            clf = sklearn.linear_model.SGDClassifier(loss=model_settings['sgd_loss'],
+                                                         max_iter=model_settings['sgd_max_iter'],
+                                                         learning_rate=model_settings['sgd_learning_rate'],
+                                                         early_stopping=model_settings['sgd_early_stopping'],
+                                                         random_state=self.random_state)
+
+            # Optimize hyperparameters with random search, using cross-validation to determine best set
+            # Here we just search over discrete values, although can also easily specify a distribution
+            param_distributions = {'penalty': model_settings['sgd_penalty'],
+                                 'alpha': model_settings['sgd_alpha'],
+                                 'tol': model_settings['sgd_tol']}
+
+            randomized_search = sklearn.model_selection.RandomizedSearchCV(clf, param_distributions,
+                                                                            n_iter=model_settings['n_iter'],
+                                                                            cv=model_settings['cv'],
+                                                                            random_state=self.random_state)
+            search_result = randomized_search.fit(X_train, y_train)
+            final_model = search_result.best_estimator_
+            result_info = search_result.cv_results_
+            print(f'Best params: {search_result.best_params_}')
+
+            # Get predictions for the test set
+            #y_predict_train = final_model.predict(X_train)
+            #y_predict_test = final_model.predict(X_test)
+
+            y_predict_train = sklearn.model_selection.cross_val_predict(clf, X_train, y_train, cv=3, method="decision_function")
+
+            # Compare AUC on train set and test set
+            AUC_train = sklearn.metrics.roc_auc_score(y_train, y_predict_train)
+            print(f'AUC = {AUC_train} (cross-val train set)')
+            print()
+
+            # Compute ROC curve: the roc_curve() function expects labels and scores
+            self.roc_curve_dict['positive_label0'][model][dim] = sklearn.metrics.roc_curve(y_train, -y_predict_train, pos_label=0)
+            self.roc_curve_dict['positive_label1'][model][dim] = sklearn.metrics.roc_curve(y_train, y_predict_train, pos_label=1)
+            self.precision_recall_dict['positive_label0'][model][dim] = sklearn.metrics.precision_recall_curve(y_train, -y_predict_train, pos_label=0)
+            self.precision_recall_dict['positive_label1'][model][dim] = sklearn.metrics.precision_recall_curve(y_train, y_predict_train, pos_label=1)
+
+        elif type == 'LDA':
+
+            # energyflow implementation
+            clf = energyflow.archs.LinearClassifier(linclass_type='lda')
+            history = clf.fit(X_train, y_train)
+            preds_EFP = clf.predict(X_test)        
+            auc_EFP = sklearn.metrics.roc_auc_score(y_test,preds_EFP[:,1])
+            print(f'  AUC = {auc_EFP} (test set)')
+            self.AUC[f'{model}{self.key_suffix}'].append(auc_EFP)
+            self.roc_curve_dict['positive_label0'][model][dim] = sklearn.metrics.roc_curve(y_test, -preds_EFP[:,1], pos_label=0)
+            self.roc_curve_dict['positive_label1'][model][dim] = sklearn.metrics.roc_curve(y_test, preds_EFP[:,1], pos_label=1)
+            self.precision_recall_dict['positive_label0'][model][dim] = sklearn.metrics.precision_recall_curve(y_test, -preds_EFP[:,1], pos_label=0)
+            self.precision_recall_dict['positive_label1'][model][dim] = sklearn.metrics.precision_recall_curve(y_test, preds_EFP[:,1], pos_label=1)
+
+        elif type == 'LDA_search':
+
+            # Define model
+            clf = sklearn.discriminant_analysis.LinearDiscriminantAnalysis()
+
+            # Optimize hyperparameters
+            param_distributions = {'tol': model_settings['lda_tol']}
+
+            randomized_search = sklearn.model_selection.GridSearchCV(clf, param_distributions)
+            search_result = randomized_search.fit(X_train, y_train)
+            final_model = search_result.best_estimator_
+            result_info = search_result.cv_results_
+            print(f'Best params: {search_result.best_params_}')
+
+            y_predict_train = sklearn.model_selection.cross_val_predict(clf, X_train, y_train, cv=3, method="decision_function")
+
+            # Compare AUC on train set and test set
+            AUC_train = sklearn.metrics.roc_auc_score(y_train, y_predict_train)
+            print(f'AUC = {AUC_train} (cross-val train set)')
+            print()
+
+            # Compute ROC curve: the roc_curve() function expects labels and scores
+            self.roc_curve_dict['positive_label0'][model][dim] = sklearn.metrics.roc_curve(y_train, -y_predict_train, pos_label=0)
+            self.roc_curve_dict['positive_label1'][model][dim] = sklearn.metrics.roc_curve(y_train, y_predict_train, pos_label=1)
+            self.precision_recall_dict['positive_label0'][model][dim] = sklearn.metrics.precision_recall_curve(y_train, -y_predict_train, pos_label=0)
+            self.precision_recall_dict['positive_label1'][model][dim] = sklearn.metrics.precision_recall_curve(y_train, y_predict_train, pos_label=1)
 
     #---------------------------------------------------------------
     # Train DNN, using hyperparameter optimization with keras tuner
@@ -1333,15 +1454,15 @@ class AnalyzeFlavor(common_base.CommonBase):
 
         class1_indices = 1 - self.y
         class2_indices = self.y
-        X_q = X_EFP_d[class1_indices.astype(bool)]
-        X_g = X_EFP_d[class2_indices.astype(bool)]
+        X_class1 = X_EFP_d[class1_indices.astype(bool)]
+        X_class2 = X_EFP_d[class2_indices.astype(bool)]
 
         # Get labels
         graphs = [str(x) for x in self.graphs[:4]]
 
         # Construct dataframes for scatter matrix plotting
         df_class1 = pd.DataFrame(X_class1, columns=graphs)
-        df_class1 = pd.DataFrame(X_class2, columns=graphs)
+        df_class2 = pd.DataFrame(X_class2, columns=graphs)
         
         # Add label columns to each df to differentiate them for plotting
         df_class1['generator'] = np.repeat(self.class1_label, X_class1.shape[0])
