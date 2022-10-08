@@ -353,9 +353,13 @@ class AnalyzeFlavor(common_base.CommonBase):
                     self.plot_QA()
 
                 # Set up dict to store roc curves
-                self.roc_curve_dict = {}
+                self.roc_curve_dict = {'positive_label0': {}, 'positive_label1': {}}
+                self.precision_recall_dict = {'positive_label0': {}, 'positive_label1': {}}
                 for model in self.models:
-                    self.roc_curve_dict[model] = {}
+                    self.roc_curve_dict['positive_label0'][model] = {}
+                    self.roc_curve_dict['positive_label1'][model] = {}
+                    self.precision_recall_dict['positive_label0'][model] = {}
+                    self.precision_recall_dict['positive_label1'][model] = {}
 
                 # Compute EFPs
                 if 'efp_dnn' in self.models:
@@ -828,18 +832,32 @@ class AnalyzeFlavor(common_base.CommonBase):
             for observable in self.qa_observables:
                 if self.y.size == len(self.qa_results[observable]):
                     if 'strange_tagger' in observable:
-                        self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, np.array(self.qa_results[observable]).astype(np.float))
+                        self.roc_curve_dict['positive_label0'][observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]).astype(float), pos_label=0)
+                        self.roc_curve_dict['positive_label1'][observable] = sklearn.metrics.roc_curve(self.y, np.array(self.qa_results[observable]).astype(float), pos_label=1)
+                        self.precision_recall_dict['positive_label0'][observable] = sklearn.metrics.precision_recall_curve(self.y, -np.array(self.qa_results[observable]).astype(float), pos_label=0)
+                        self.precision_recall_dict['positive_label1'][observable] = sklearn.metrics.precision_recall_curve(self.y, np.array(self.qa_results[observable]).astype(float), pos_label=1)
                     else:
-                        self.roc_curve_dict[observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]).astype(np.float))
+                        self.roc_curve_dict['positive_label0'][observable] = sklearn.metrics.roc_curve(self.y, np.array(self.qa_results[observable]).astype(float), pos_label=0)
+                        self.roc_curve_dict['positive_label1'][observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]).astype(float), pos_label=1)
+                        self.precision_recall_dict['positive_label0'][observable] = sklearn.metrics.precision_recall_curve(self.y, np.array(self.qa_results[observable]).astype(float), pos_label=0)
+                        self.precision_recall_dict['positive_label1'][observable] = sklearn.metrics.precision_recall_curve(self.y, -np.array(self.qa_results[observable]).astype(float), pos_label=1)
                 else:
                     print(f'Skip constructing ROC curve for observable={observable}, due to mismatch with number of labels')
 
+        # Print number of events in each class
+        class_count_dict = {}
+        class_count_dict['1'] = np.sum(self.y_total)
+        class_count_dict['0'] = self.y_total.size
+        print(f'class_count_dict: {class_count_dict}')
+        
         # Save ROC curves to file
         if 'nsub_dnn' in self.models or 'efp_dnn' in self.models or 'pfn' in self.models or 'efn' in self.models:
             output_filename = os.path.join(self.output_dir_i, f'ROC{self.key_suffix}.pkl')
             with open(output_filename, 'wb') as f:
                 pickle.dump(self.roc_curve_dict, f)
+                pickle.dump(self.precision_recall_dict, f)
                 pickle.dump(self.AUC, f)
+                pickle.dump(class_count_dict, f)
 
     #---------------------------------------------------------------
     # Fit Dense Neural Network for EFPs
@@ -901,7 +919,10 @@ class AnalyzeFlavor(common_base.CommonBase):
         self.AUC[f'{model}{self.key_suffix}'].append(auc_DNN)
         
         # Get & store ROC curve
-        self.roc_curve_dict[model][dim] = sklearn.metrics.roc_curve(Y_test, preds_DNN)
+        self.roc_curve_dict['positive_label0'][model][dim] = sklearn.metrics.roc_curve(Y_test, -preds_DNN, pos_label=0)
+        self.roc_curve_dict['positive_label1'][model][dim] = sklearn.metrics.roc_curve(Y_test, preds_DNN, pos_label=1)
+        self.precision_recall_dict['positive_label0'][model][dim] = sklearn.metrics.precision_recall_curve(Y_test, -preds_DNN, pos_label=0)
+        self.precision_recall_dict['positive_label1'][model][dim] = sklearn.metrics.precision_recall_curve(Y_test, preds_DNN, pos_label=1)
 
     #---------------------------------------------------------------
     # Construct model for hyperparameter tuning with keras tuner
@@ -997,9 +1018,12 @@ class AnalyzeFlavor(common_base.CommonBase):
         auc_PFN = sklearn.metrics.roc_auc_score(Y_PFN_test[:,1], preds_PFN[:,1])
         print('Particle Flow Networks/Deep Sets: AUC = {} (test set)'.format(auc_PFN))
         self.AUC[f'{model}{self.key_suffix}'].append(auc_PFN)
-        
-        self.roc_curve_dict[model] = sklearn.metrics.roc_curve(Y_PFN_test[:,1], preds_PFN[:,1])
-        
+
+        self.roc_curve_dict['positive_label0'][model] = sklearn.metrics.roc_curve(Y_PFN_test[:,1], -preds_PFN[:,1], pos_label=0)
+        self.roc_curve_dict['positive_label1'][model] = sklearn.metrics.roc_curve(Y_PFN_test[:,1], preds_PFN[:,1], pos_label=1)
+        self.precision_recall_dict['positive_label0'][model] = sklearn.metrics.precision_recall_curve(Y_PFN_test[:,1], -preds_PFN[:,1], pos_label=0)
+        self.precision_recall_dict['positive_label1'][model] = sklearn.metrics.precision_recall_curve(Y_PFN_test[:,1], preds_PFN[:,1], pos_label=1)
+
     #---------------------------------------------------------------
     # Fit ML model -- (IRC safe) Energy Flow Networks
     #---------------------------------------------------------------
@@ -1093,7 +1117,10 @@ class AnalyzeFlavor(common_base.CommonBase):
         print('(IRC safe) Energy Flow Networks: AUC = {} (test set)'.format(auc_EFN))
         self.AUC[f'{model}{self.key_suffix}'].append(auc_EFN)
         
-        self.roc_curve_dict[model] = sklearn.metrics.roc_curve(Y_EFN_test[:,1], preds_EFN[:,1])
+        self.roc_curve_dict['positive_label0'][model] = sklearn.metrics.roc_curve(Y_EFN_test[:,1], -preds_EFN[:,1], pos_label=0)
+        self.roc_curve_dict['positive_label1'][model] = sklearn.metrics.roc_curve(Y_EFN_test[:,1], preds_EFN[:,1], pos_label=1)
+        self.precision_recall_dict['positive_label0'][model] = sklearn.metrics.precision_recall_curve(Y_EFN_test[:,1], -preds_EFN[:,1], pos_label=0)
+        self.precision_recall_dict['positive_label1'][model] = sklearn.metrics.precision_recall_curve(Y_EFN_test[:,1], preds_EFN[:,1], pos_label=1)
 
     #--------------------------------------------------------------- 
     # My own remap PID routine (similar to remap_pids from energyflow)

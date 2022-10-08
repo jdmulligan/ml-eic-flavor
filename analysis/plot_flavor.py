@@ -40,7 +40,10 @@ class PlotFlavor(common_base.CommonBase):
         self.initialize_config()
 
         # Suffix for plot outputfile names
-        self.roc_plot_index = {type:0 for type in self.reference_particle_input_types}
+        self.plot_index = {'ROC': {type:0 for type in self.reference_particle_input_types},
+                           'PR': {type:0 for type in self.reference_particle_input_types}}
+        
+        self.positive_labels = ['positive_label0', 'positive_label1']
 
         self.plot_title = True
                 
@@ -93,7 +96,9 @@ class PlotFlavor(common_base.CommonBase):
             # Load ROC curves for all possible particle_input_type
             self.output_dir_dict = {}
             self.roc_curve_dict = {}
+            self.precision_recall_dict = {}
             self.AUC_dict = {}
+            self.class_count_dict = {}
             for particle_input_type in self.reference_particle_input_types:
             
                 # Load ML results from file
@@ -102,16 +107,30 @@ class PlotFlavor(common_base.CommonBase):
                 if os.path.exists(roc_filename):
                     with open(roc_filename, 'rb') as f:
                         self.roc_curve_dict[particle_input_type] = pickle.load(f)
+                        self.precision_recall_dict[particle_input_type] = pickle.load(f)
                         self.AUC_dict[particle_input_type] = pickle.load(f)
+                        self.class_count_dict[particle_input_type] = pickle.load(f)
+
             print(f'We found output directories for the following: {list(self.roc_curve_dict.keys())}')
 
             # Plot models
-            self.plot_models(jet_pt_min)
+            for positive_label in self.positive_labels:
+                self.plot_models(jet_pt_min, positive_label, metric='ROC')
+                self.plot_models(jet_pt_min, positive_label, metric='PR')
 
     #---------------------------------------------------------------
     # Plot several versions of ROC curves
     #---------------------------------------------------------------
-    def plot_models(self, jet_pt_min):
+    def plot_models(self, jet_pt_min, positive_label, metric=''):
+
+        results = {}
+        for particle_input_type in self.particle_input_type_list:
+            if metric == 'ROC':
+                results[particle_input_type] = self.roc_curve_dict[particle_input_type][positive_label]
+            elif metric == 'PR':
+                results[particle_input_type] = self.precision_recall_dict[particle_input_type][positive_label]
+            else:
+                sys.exit(f'ERROR: metric {metric} not supported')
 
         #--------------------------
         # First, make plots for each particle_input_type specified in config file
@@ -135,19 +154,19 @@ class PlotFlavor(common_base.CommonBase):
 
                 roc_list = {}
                 for model in models:
-                    if model in list(self.roc_curve_dict[particle_input_type].keys()):
-                        roc_list[model] = self.roc_curve_dict[particle_input_type][model]
+                    if model in list(results[particle_input_type].keys()):
+                        roc_list[model] = results[particle_input_type][model]
 
                 if self.event_type == 'dis':
                     for kappa in self.kappa:
                         charge_label = f'jet_charge_ptmin{particle_pt_min}_k{kappa}'
-                        roc_list[charge_label] = self.roc_curve_dict[particle_input_type][charge_label]
+                        roc_list[charge_label] = results[particle_input_type][charge_label]
 
                 if self.class2_label == 's':
                     strange_tagger_label = f'strange_tagger_ptmin{particle_pt_min}'
-                    roc_list[strange_tagger_label] = self.roc_curve_dict[particle_input_type][strange_tagger_label]
+                    roc_list[strange_tagger_label] = results[particle_input_type][strange_tagger_label]
 
-                self.plot_roc_curves(roc_list, jet_pt_min, particle_input_type, type=type, outputdir=self.output_dir_dict[particle_input_type])
+                self.plot_roc_curves(metric, roc_list, jet_pt_min, particle_input_type, type=type, outputdir=self.output_dir_dict[particle_input_type], positive_label=positive_label)
 
             # Plot all particle_pt_min for either pid/charge/nopid
             type='varied_ptmin'
@@ -159,10 +178,10 @@ class PlotFlavor(common_base.CommonBase):
                 for particle_pt_min in self.particle_pt_min_list:
 
                     model = f'pfn_{pfn_label}_minpt{particle_pt_min}'
-                    if model in self.roc_curve_dict[particle_input_type].keys():
-                        roc_list[model] = self.roc_curve_dict[particle_input_type][model]
+                    if model in results[particle_input_type].keys():
+                        roc_list[model] = results[particle_input_type][model]
 
-                self.plot_roc_curves(roc_list, jet_pt_min, particle_input_type, type=type, outputdir=self.output_dir_dict[particle_input_type])
+                self.plot_roc_curves(metric, roc_list, jet_pt_min, particle_input_type, type=type, outputdir=self.output_dir_dict[particle_input_type], positive_label=positive_label)
 
         #--------------------------
         # Plot combination of all possible particle_input_types in a single plot
@@ -177,10 +196,10 @@ class PlotFlavor(common_base.CommonBase):
 
                         model = f'pfn_{pfn_label}_minpt{particle_pt_min}'
                         if particle_input_type in self.roc_curve_dict.keys():
-                            if model in self.roc_curve_dict[particle_input_type].keys():
-                                roc_list[f'{model}_{particle_input_type}'] = self.roc_curve_dict[particle_input_type][model]
+                            if model in results[particle_input_type].keys():
+                                roc_list[f'{model}_{particle_input_type}'] = results[particle_input_type][model]
 
-                    self.plot_roc_curves(roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, outputdir=self.output_dir_dict[self.particle_input_type_list[0]])
+                    self.plot_roc_curves(metric, roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, outputdir=self.output_dir_dict[self.particle_input_type_list[0]], positive_label=positive_label)
 
         #--------------------------
         # Plot overlay of different minpt constituent cuts for all possible particle_input_types in a single plot
@@ -197,18 +216,31 @@ class PlotFlavor(common_base.CommonBase):
 
                         model = f'pfn_{pfn_label}_minpt{particle_pt_min}'
                         if particle_input_type in self.roc_curve_dict.keys():
-                            if model in self.roc_curve_dict[particle_input_type].keys():
-                                roc_list[f'{model}_{particle_input_type}'] = self.roc_curve_dict[particle_input_type][model]
+                            if model in results[particle_input_type].keys():
+                                roc_list[f'{model}_{particle_input_type}'] = results[particle_input_type][model]
 
-                self.plot_roc_curves(roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, in_vs_out_overlay=True, outputdir=self.output_dir_dict[self.particle_input_type_list[0]])
+                self.plot_roc_curves(metric, roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, in_vs_out_overlay=True, outputdir=self.output_dir_dict[self.particle_input_type_list[0]], positive_label=positive_label)
 
     #--------------------------------------------------------------- 
     # Plot ROC curves
     #--------------------------------------------------------------- 
-    def plot_roc_curves(self, roc_list, jet_pt_min, particle_input_type, type='', in_vs_out_overlay=False, outputdir=''):
+    def plot_roc_curves(self, metric, roc_list, jet_pt_min, particle_input_type, type='', in_vs_out_overlay=False, outputdir='', positive_label=''):
     
-        plt.plot([0, 1], [0, 1], 'k--') # dashed diagonal
-        plt.axis([0, 1, 0, 1])
+        if metric == 'ROC':
+            plt.axis([0, 1, 0, 1])
+            plt.plot([0, 1], [0, 1], 'k--') # dashed diagonal
+        elif metric == 'PR':
+            class_count_dict = self.class_count_dict[particle_input_type]
+            class_count_sum = class_count_dict['0'] + class_count_dict['1']
+            if positive_label == 'positive_label0':
+                positive_fraction = class_count_dict['0'] / class_count_sum
+            elif positive_label == 'positive_label1':
+                positive_fraction = class_count_dict['1'] / class_count_sum
+            else:
+                sys.exit(f'ERROR: positive_label = {positive_label}')
+            plt.plot([0, 1], [positive_fraction, positive_fraction], 'k--') # dashed horizontal line
+
+        plt.grid(True)
 
         title = f'{self.class1_label} vs. {self.class2_label}     ' + rf'$p_{{\mathrm{{T,jet}}}}>{jet_pt_min}\;\mathrm{{GeV}}$'
         if type == 'fixed_ptmin':
@@ -249,12 +281,22 @@ class PlotFlavor(common_base.CommonBase):
         if self.plot_title:
             plt.title(title, fontsize=14)
 
-        plt.xlabel(f'False {self.class1_label} Rate', fontsize=16)
-        plt.ylabel(f'True {self.class1_label} Rate', fontsize=16)
-        plt.grid(True)
+        if metric == 'ROC':
+            if positive_label == 'positive_label0':
+                plt.xlabel(f'False {self.class1_label} Rate', fontsize=16)
+                plt.ylabel(f'True {self.class1_label} Rate', fontsize=16)
+            elif positive_label == 'positive_label1':
+                plt.xlabel(f'False {self.class2_label} Rate', fontsize=16)
+                plt.ylabel(f'True {self.class2_label} Rate', fontsize=16)
+        elif metric == 'PR':
+            if positive_label == 'positive_label0':
+                plt.xlabel(f'{self.class1_label} Recall', fontsize=16)
+                plt.ylabel(f'{self.class1_label} Precision', fontsize=16)
+            elif positive_label == 'positive_label1':
+                plt.xlabel(f'{self.class2_label} Recall', fontsize=16)
+                plt.ylabel(f'{self.class2_label} Precision', fontsize=16)
     
         for label,value in roc_list.items():
-            index=0
             if 'pfn' in label:
 
                 minpt = label.rsplit('_')[2][5:]
@@ -342,19 +384,26 @@ class PlotFlavor(common_base.CommonBase):
                     minpt = '0.1'
                 label += rf'   ($p_{{T,\mathrm{{particle}}}}>{minpt}$ GeV)'
 
-            FPR = value[0]
-            TPR = value[1]
-            plt.plot(FPR, TPR, linewidth=linewidth, label=label,
+            if metric == 'ROC':
+                x = value[0] # FPR
+                y = value[1] # TPR
+            elif metric == 'PR':
+                x = value[1] # Recall
+                y = value[0] # Precision
+            plt.plot(x, y, linewidth=linewidth, label=label,
                      linestyle=linestyle, alpha=alpha, color=color)
                     
         legend_fontsize = 10
         plt.legend(loc='lower right', fontsize=legend_fontsize)
 
         plt.tight_layout()
-        plt.savefig(os.path.join(outputdir, f'ROC_{self.roc_plot_index[particle_input_type]}.pdf'))
+        if metric == 'ROC':
+            plt.savefig(os.path.join(outputdir, f'ROC_poslabel{positive_label[-1]}__{self.plot_index[metric][particle_input_type]}.pdf'))
+        elif metric == 'PR':
+            plt.savefig(os.path.join(outputdir, f'PR_poslabel{positive_label[-1]}__{self.plot_index[metric][particle_input_type]}.pdf'))
         plt.close()
 
-        self.roc_plot_index[particle_input_type] += 1
+        self.plot_index[metric][particle_input_type] += 1
 
     #---------------------------------------------------------------
     # Get color for a given label
