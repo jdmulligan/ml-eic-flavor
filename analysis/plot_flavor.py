@@ -225,6 +225,27 @@ class PlotFlavor(common_base.CommonBase):
 
                 self.plot_roc_curves(metric, roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, in_vs_out_overlay=True, outputdir=self.output_dir_dict[self.particle_input_type_list[0]], positive_label=positive_label)
 
+        #--------------------------
+        # Plot q/g (photoproduction w/leading jet): PFN, EFN, mass
+        if self.event_type == 'photoproduction' and self.particle_input_type_list[0] == 'leading':
+
+            type = 'fixed_ptmin'
+            for particle_pt_min in self.particle_pt_min_list:
+
+                pfn_charge_label = f'pfn_charge_minpt{particle_pt_min}'
+                pfn_pid_label = f'pfn_pid_minpt{particle_pt_min}'
+                pfn_nopid_label = f'pfn_nopid_minpt{particle_pt_min}'
+                efn_label = f'efn_minpt{particle_pt_min}'
+                mass_label = f'jet_mass_ptmin{particle_pt_min}'
+                models = [pfn_charge_label, pfn_pid_label, pfn_nopid_label, efn_label, mass_label]
+
+                roc_list = {}
+                for model in models:
+                    if model in list(results[self.particle_input_type_list[0]].keys()):
+                        roc_list[model] = results[self.particle_input_type_list[0]][model]
+
+                self.plot_roc_curves(metric, roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, outputdir=self.output_dir_dict[particle_input_type], positive_label=positive_label)
+
     #--------------------------------------------------------------- 
     # Plot ROC curves
     #--------------------------------------------------------------- 
@@ -351,6 +372,16 @@ class PlotFlavor(common_base.CommonBase):
                 else:
                     label = 'Particle Flow Network'
 
+            elif 'efn' in label:
+
+                minpt = label.rsplit('_')[1][5:]
+                color=self.color(label, particle_pt_min=minpt, type=type)
+                linestyle = self.linestyle(label)
+                linewidth = 4
+                alpha = 0.5
+
+                label = 'Energy Flow Network'
+
             elif 'jet_charge' in label:
                 linewidth = 4
                 alpha = 0.5
@@ -437,6 +468,8 @@ class PlotFlavor(common_base.CommonBase):
                 color = sns.xkcd_rgb['faded purple']  
             elif 'pfn_nopid' in label:
                 color = sns.xkcd_rgb['faded red'] 
+            elif 'efn' in label:
+                color = sns.xkcd_rgb['light brown'] 
             elif 'strange_tagger' in label:
                 color = sns.xkcd_rgb['medium green']  
             elif 'jet_charge' in label:
@@ -482,7 +515,7 @@ class PlotFlavor(common_base.CommonBase):
     def linestyle(self, label):
  
         linestyle = None
-        if 'pfn' in label:
+        if 'pfn' in label or 'efn' in label:
             linestyle = 'solid'
         else:
             linestyle = 'dotted'

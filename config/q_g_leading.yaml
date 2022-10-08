@@ -2031,7 +2031,7 @@ n_test: 200000
 balance_samples: False
 
 # Select model: pfn, efn, efp_linear, efp_lasso, efp_dnn
-models: [pfn]
+models: [pfn, efn]
 
 # efp parameters
 dmax: 5                                             # maximal degree of the EFPs

@@ -847,7 +847,13 @@ class AnalyzeFlavor(common_base.CommonBase):
                         self.fit_pfn(model_label, model_settings, self.y, self.X_particles[f'particle_pt_min{particle_pt_min}'], mass=True)
 
             if model == 'efn':
-                self.fit_efn(model, model_settings)
+
+                for particle_pt_min in self.particle_pt_min_list:
+                    print(f'Fitting PFNs for particle_pt_min={particle_pt_min}')
+                
+                    model_label = f'efn_minpt{particle_pt_min}'
+                    self.AUC[f'{model_label}{self.key_suffix}'] = []
+                    self.fit_efn(model_label, model_settings, self.y, self.X_particles[f'particle_pt_min{particle_pt_min}'])
 
         # Save traditional observables (only for "in-jet" case, to save time)
         if particle_input_type in ['in', 'leading']:
@@ -995,7 +1001,7 @@ class AnalyzeFlavor(common_base.CommonBase):
         # Preprocess by centering jets
         # For DIS, all particles (both in-jet and out-of-jet) are already centered in eta-phi 
         #          around leading jet, so we can skip this step
-        # (note that out-of-jet particles can be empty, i.e. only zerp pads, which will cause crash if not handled)
+        # (note that out-of-jet particles can be empty, i.e. only zero pads, which will cause crash if not handled)
         #for x_PFN in X_PFN:
         #    mask = x_PFN[:,0] > 0
         #    yphi_avg = np.average(x_PFN[mask,1:3], weights=x_PFN[mask,0], axis=0)
@@ -1049,62 +1055,66 @@ class AnalyzeFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     # Fit ML model -- (IRC safe) Energy Flow Networks
     #---------------------------------------------------------------
-    def fit_efn(self, model, model_settings):
+    def fit_efn(self, model, model_settings, y, X_particles):
     
         # Convert labels to categorical
-        Y_EFN = energyflow.utils.to_categorical(self.y, num_classes=2)
+        Y_EFN = energyflow.utils.to_categorical(y, num_classes=2)
                         
-        # (pT,y,phi,m)
-        X_EFN = self.X_particles['particle_pt_min0'][:,:,:4] # Remove pid,charge from self.X_particles
-        
+        # (z,y,phi)
+        X_EFN = X_particles[:,:,[1,2,3]] # Remove pid,charge from X_particles (pt, z, eta, phi, m, pid, charge)
+
         # Can switch here to quark vs gluon data set
         #X_EFN, y_EFN = energyflow.datasets.qg_jets.load(self.n_train + self.n_val + self.n_test)
         #Y_EFN = energyflow.utils.to_categorical(y_EFN, num_classes=2)
         #print('(n_jets, n_particles per jet, n_variables): {}'.format(X_EFN.shape))
-
+        #
         # For now just use the first 30 entries of the 4-vectors per jet (instead of 800)
         #np.set_printoptions(threshold=sys.maxsize)        
-        #X_EFN = X_EFN[:,:30]        
-        
+        #X_EFN = X_EFN[:,:30]   
+        # 
+
+        # Particles are already centered in eta-phi around leading jet, 
+        # as well as using z rather than pt, so we can skip this step.
+        #
         # Preprocess data set by centering jets and normalizing pts
         # Note: this step is somewhat different for pp/AA compared to the quark/gluon data set
-        for x_EFN in X_EFN:
-            mask = x_EFN[:,0] > 0
-            
-            # Compute y,phi averages
-            yphi_avg = np.average(x_EFN[mask,1:3], weights=x_EFN[mask,0], axis=0)
-
-            # Adjust phi range: Initially it is [0,2Pi], now allow for negative values and >2Pi 
-            # so there are no gaps for a given jet.
-            # Mask particles that are far away from the average phi & cross the 2Pi<->0 boundary
-            mask_phi_1 = ((x_EFN[:,2] - yphi_avg[1] >  np.pi) & (x_EFN[:,2] != 0.))
-            mask_phi_2 = ((x_EFN[:,2] - yphi_avg[1] < -np.pi) & (x_EFN[:,2] != 0.))
-            
-            x_EFN[mask_phi_1,2] -= 2*np.pi
-            x_EFN[mask_phi_2,2] += 2*np.pi            
-            
-            # Now recompute y,phi averages after adjusting the phi range
-            yphi_avg1 = np.average(x_EFN[mask,1:3], weights=x_EFN[mask,0], axis=0)            
-            
-            # And center jets in the y,phi plane
-            x_EFN[mask,1:3] -= yphi_avg1
-
-            # Normalize transverse momenta p_Ti -> z_i
-            x_EFN[mask,0] /= x_EFN[:,0].sum()
-            
-            # Set particle four-vectors to zero if the z value is below a certain threshold.
-            mask2 = x_EFN[:,0]<0.00001
-            x_EFN[mask2,:]=0
-        
+        #for x_EFN in X_EFN:
+        #    mask = x_EFN[:,0] > 0
+        #    
+        #    # Compute y,phi averages
+        #    yphi_avg = np.average(x_EFN[mask,1:3], weights=x_EFN[mask,0], axis=0)
+        #
+        #    # Adjust phi range: Initially it is [0,2Pi], now allow for negative values and >2Pi 
+        #    # so there are no gaps for a given jet.
+        #    # Mask particles that are far away from the average phi & cross the 2Pi<->0 boundary
+        #    mask_phi_1 = ((x_EFN[:,2] - yphi_avg[1] >  np.pi) & (x_EFN[:,2] != 0.))
+        #    mask_phi_2 = ((x_EFN[:,2] - yphi_avg[1] < -np.pi) & (x_EFN[:,2] != 0.))
+        #    
+        #    x_EFN[mask_phi_1,2] -= 2*np.pi
+        #    x_EFN[mask_phi_2,2] += 2*np.pi            
+        #    
+        #    # Now recompute y,phi averages after adjusting the phi range
+        #    yphi_avg1 = np.average(x_EFN[mask,1:3], weights=x_EFN[mask,0], axis=0)            
+        #    
+        #    # And center jets in the y,phi plane
+        #    x_EFN[mask,1:3] -= yphi_avg1
+        #
+        #    # Normalize transverse momenta p_Ti -> z_i
+        #    x_EFN[mask,0] /= x_EFN[:,0].sum()
+        #    
+        #    # Set particle four-vectors to zero if the z value is below a certain threshold.
+        #    mask2 = x_EFN[:,0]<0.00001
+        #    x_EFN[mask2,:]=0
+        #
         # Do not use PID for EFNs
-        X_EFN = X_EFN[:,:,:3]
-        
+        #X_EFN = X_EFN[:,:,:3]
+        #
         # Make 800 four-vector array smaller, e.g. only 150. Ok w/o background
-        X_EFN = X_EFN[:,:150]
+        #X_EFN = X_EFN[:,:150]
         
         # Check shape
-        if self.y.shape[0] != X_EFN.shape[0]:
-            print(f'Number of labels {self.y.shape} does not match number of jets {X_EFN.shape} ! ')
+        if y.shape[0] != X_EFN.shape[0]:
+            print(f'Number of labels {y.shape} does not match number of jets {X_EFN.shape} ! ')
             
         # Split data into train, val and test sets 
         # and separate momentum fraction z and angles (y,phi)
@@ -1135,14 +1145,14 @@ class AnalyzeFlavor(common_base.CommonBase):
         preds_EFN = efn.predict([z_EFN_test,p_EFN_test], batch_size=1000)     
 
         # Get AUC and ROC curve + make plot
-        auc_EFN = sklearn.metrics.roc_auc_score(Y_EFN_test[:,1], preds_EFN[:,1])
+        auc_EFN = sklearn.metrics.roc_auc_score(Y_EFN_test[:,1], -preds_EFN[:,1])
         print('(IRC safe) Energy Flow Networks: AUC = {} (test set)'.format(auc_EFN))
         self.AUC[f'{model}{self.key_suffix}'].append(auc_EFN)
         
-        self.roc_curve_dict['positive_label0'][model] = sklearn.metrics.roc_curve(Y_EFN_test[:,1], -preds_EFN[:,1], pos_label=0)
-        self.roc_curve_dict['positive_label1'][model] = sklearn.metrics.roc_curve(Y_EFN_test[:,1], preds_EFN[:,1], pos_label=1)
-        self.precision_recall_dict['positive_label0'][model] = sklearn.metrics.precision_recall_curve(Y_EFN_test[:,1], -preds_EFN[:,1], pos_label=0)
-        self.precision_recall_dict['positive_label1'][model] = sklearn.metrics.precision_recall_curve(Y_EFN_test[:,1], preds_EFN[:,1], pos_label=1)
+        self.roc_curve_dict['positive_label0'][model] = sklearn.metrics.roc_curve(Y_EFN_test[:,1], preds_EFN[:,1], pos_label=0)
+        self.roc_curve_dict['positive_label1'][model] = sklearn.metrics.roc_curve(Y_EFN_test[:,1], -preds_EFN[:,1], pos_label=1)
+        self.precision_recall_dict['positive_label0'][model] = sklearn.metrics.precision_recall_curve(Y_EFN_test[:,1], preds_EFN[:,1], pos_label=0)
+        self.precision_recall_dict['positive_label1'][model] = sklearn.metrics.precision_recall_curve(Y_EFN_test[:,1], -preds_EFN[:,1], pos_label=1)
 
     #--------------------------------------------------------------- 
     # My own remap PID routine (similar to remap_pids from energyflow)
