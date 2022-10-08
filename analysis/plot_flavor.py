@@ -162,6 +162,10 @@ class PlotFlavor(common_base.CommonBase):
                         charge_label = f'jet_charge_ptmin{particle_pt_min}_k{kappa}'
                         roc_list[charge_label] = results[particle_input_type][charge_label]
 
+                if self.event_type == 'photoproduction':
+                    mass_label = f'jet_mass_ptmin{particle_pt_min}'
+                    roc_list[mass_label] = results[particle_input_type][mass_label]
+
                 if self.class2_label == 's':
                     strange_tagger_label = f'strange_tagger_ptmin{particle_pt_min}'
                     roc_list[strange_tagger_label] = results[particle_input_type][strange_tagger_label]
@@ -361,6 +365,19 @@ class PlotFlavor(common_base.CommonBase):
 
                 label = rf'Jet charge, $\kappa={kappa}$'
 
+            elif 'jet_mass' in label:
+                linewidth = 4
+                alpha = 0.5
+                label = label
+                linewidth = 2
+                alpha = 0.6
+
+                minpt = label.rsplit('_')[2][4:]
+                color=self.color(label, particle_pt_min=minpt, type=type)
+                linestyle = self.linestyle(label)
+
+                label = 'Jet mass'
+
             elif 'strange_tagger' in label:
                 linewidth = 4
                 alpha = 0.5
@@ -429,6 +446,8 @@ class PlotFlavor(common_base.CommonBase):
                     color = sns.xkcd_rgb['light brown'] 
                 if kappa == '0.7':
                     color = sns.xkcd_rgb['medium brown']
+            elif 'jet_mass' in label:
+                color = sns.xkcd_rgb['watermelon'] 
             else:
                 color = sns.xkcd_rgb['almost black']
 

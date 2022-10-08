@@ -94,9 +94,10 @@ def compute_jet_charge(X_particles, kappa):
 # Compute other jet observables
 #---------------------------------------------------------------        
 @jit(nopython=True)
-def compute_other_jet_observables(X_particles, compute_multiplicity, compute_strange_tagger):
+def compute_other_jet_observables(X_particles, compute_multiplicity, compute_mass, compute_strange_tagger):
 
     particle_multiplicity_array = np.zeros(X_particles.shape[0])
+    jet_mass_array = np.zeros(X_particles.shape[0])
     strange_tagger_array = np.zeros(X_particles.shape[0])
         
     for i in prange(X_particles.shape[0]):
@@ -107,6 +108,19 @@ def compute_other_jet_observables(X_particles, compute_multiplicity, compute_str
             pid_nonzero = pid[ pid != 0]
             if compute_multiplicity:
                 particle_multiplicity_array[i] = pid_nonzero.size
+
+        if compute_mass:
+            pt = X_particles[i][:,0]
+            eta = X_particles[i][:,2]
+            phi = X_particles[i][:,3]
+            m = X_particles[i][:,4]
+
+            px = np.multiply(pt, np.cos(phi))
+            py = np.multiply(pt, np.sin(phi))
+            pz = np.multiply(pt, np.sinh(eta))
+            E = np.sqrt(np.square(px) + np.square(py) + np.square(pz) + np.square(m))
+
+            jet_mass_array[i] = np.sqrt( np.square(np.sum(E)) - np.square(np.sum(pt)) )
             
         # Compute whether leading particle in jet has a strange hadron in it
         if compute_strange_tagger:
@@ -114,7 +128,7 @@ def compute_other_jet_observables(X_particles, compute_multiplicity, compute_str
                                              -321, -3222, -3112, -3312, -3322, -3334, -3122])
             strange_tagger_array[i] = pid[np.argmax(X_particles[i][:,0])] in strange_particle_pdg
 
-    return particle_multiplicity_array, strange_tagger_array
+    return particle_multiplicity_array, jet_mass_array, strange_tagger_array
 
 ################################################################
 class AnalyzeFlavor(common_base.CommonBase):
@@ -228,6 +242,7 @@ class AnalyzeFlavor(common_base.CommonBase):
         self.balance_samples = config['balance_samples']
 
         self.compute_multiplicity = self.event_type == 'photoproduction'
+        self.compute_mass = self.event_type == 'photoproduction'
         self.compute_strange_tagger = 's' in self.classes_class2
         self.check_properties_of_charge0_jets = False
         
@@ -260,7 +275,10 @@ class AnalyzeFlavor(common_base.CommonBase):
                 self.model_settings[model]['pid'] = config[model]['pid']
                 self.model_settings[model]['nopid'] = config[model]['nopid']
                 self.model_settings[model]['charge'] = config[model]['charge']
-                self.model_settings[model]['mass'] = config[model]['mass']
+                if 'mass' in config:
+                    self.model_settings[model]['mass'] = config[model]['mass']
+                else: 
+                    self.model_settings[model]['mass'] = False
 
             if model == 'efn':
                 self.model_settings[model]['Phi_sizes'] = tuple(config[model]['Phi_sizes'])
@@ -348,7 +366,7 @@ class AnalyzeFlavor(common_base.CommonBase):
                         self.X_particles[f'particle_pt_min{particle_pt_min}'] = filter_four_vectors(np.copy(self.X_particles_unfiltered), min_pt=particle_pt_min)
 
                 # Also compute some jet observables
-                if particle_input_type in ['in', 'leading', 'leading+subleading', 'all']:
+                if particle_input_type in ['in', 'leading']:
                     self.compute_jet_observables()
                     self.plot_QA()
 
@@ -713,6 +731,8 @@ class AnalyzeFlavor(common_base.CommonBase):
             self.qa_observables += [f'jet_charge_ptmin{particle_pt_min}_k{kappa}' for kappa in self.kappa]
             if self.compute_multiplicity:
                 self.qa_observables += [f'particle_multiplicity_ptmin{particle_pt_min}']
+            if self.compute_mass:
+                self.qa_observables += [f'jet_mass_ptmin{particle_pt_min}']
             if self.compute_strange_tagger:
                 self.qa_observables += [f'strange_tagger_ptmin{particle_pt_min}']
             if self.check_properties_of_charge0_jets:
@@ -767,11 +787,13 @@ class AnalyzeFlavor(common_base.CommonBase):
             print(f'    for jets with particle_pt_min={particle_pt_min}')
 
             if self.compute_multiplicity or self.compute_strange_tagger:
-                particle_multiplicity_array, strange_tagger_array = compute_other_jet_observables(self.X_particles[f'particle_pt_min{particle_pt_min}'], 
-                                                                                                  self.compute_multiplicity, self.compute_strange_tagger)
+                particle_multiplicity_array, jet_mass_array, strange_tagger_array = compute_other_jet_observables(self.X_particles[f'particle_pt_min{particle_pt_min}'], 
+                                                                                                  self.compute_multiplicity, self.compute_mass, self.compute_strange_tagger)
             
                 if self.compute_multiplicity:
                     self.qa_results[f'particle_multiplicity_ptmin{particle_pt_min}'] = particle_multiplicity_array
+                if self.compute_mass:
+                    self.qa_results[f'jet_mass_ptmin{particle_pt_min}'] = jet_mass_array
                 if self.compute_strange_tagger:
                     self.qa_results[f'strange_tagger_ptmin{particle_pt_min}'] = strange_tagger_array
 
@@ -828,10 +850,10 @@ class AnalyzeFlavor(common_base.CommonBase):
                 self.fit_efn(model, model_settings)
 
         # Save traditional observables (only for "in-jet" case, to save time)
-        if particle_input_type == 'in':
+        if particle_input_type in ['in', 'leading']:
             for observable in self.qa_observables:
                 if self.y.size == len(self.qa_results[observable]):
-                    if 'strange_tagger' in observable:
+                    if 'strange_tagger' in observable or 'jet_mass' in observable:
                         self.roc_curve_dict['positive_label0'][observable] = sklearn.metrics.roc_curve(self.y, -np.array(self.qa_results[observable]).astype(float), pos_label=0)
                         self.roc_curve_dict['positive_label1'][observable] = sklearn.metrics.roc_curve(self.y, np.array(self.qa_results[observable]).astype(float), pos_label=1)
                         self.precision_recall_dict['positive_label0'][observable] = sklearn.metrics.precision_recall_curve(self.y, -np.array(self.qa_results[observable]).astype(float), pos_label=0)
