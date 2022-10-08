@@ -219,6 +219,7 @@ class AnalyzeFlavor(common_base.CommonBase):
         if self.event_type == 'photoproduction':
             self.leading_jet_pt_min = config['leading_jet_pt_min']
             self.subleading_jet_pt_min = config['subleading_jet_pt_min']
+            self.third_jet_pt_max = config['third_jet_pt_max']
             self.jet_pt_min_list = [self.leading_jet_pt_min]
         elif self.event_type == 'dis':
             self.jet_pt_min_list = config['jet_pt_min_list']
@@ -537,7 +538,11 @@ class AnalyzeFlavor(common_base.CommonBase):
             if self.event_type == 'dis':
                 jet_df = jet_df.groupby(['event'], as_index=False).apply(self.preprocess_dis_event, particle_input_type).reset_index(drop=True)
             elif self.event_type == 'photoproduction':
+                self.n_jets_dict = {x:0 for x in range(0,5)}
+                self.n_other_dict = {x:0 for x in range(0,5)}
                 jet_df = jet_df.groupby(['event'], as_index=False).apply(self.preprocess_photoproduction_event, particle_input_type).reset_index(drop=True)
+                print(f'number of positive jet ids per event: {self.n_jets_dict}')
+                print(f'number of negative jet ids per event: {self.n_other_dict}')
             print(f'time to run preprocess_event(): {time.time()-start}')
 
             # For DIS jets, set jet indices for out-of-jet particles to be the same as the in-jet particles
@@ -676,26 +681,31 @@ class AnalyzeFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     def preprocess_photoproduction_event(self, event, particle_input_type):
 
-        #print(event)
         event_jets = event[event['jet']>0]
-        n_jets = event_jets['jet'].nunique()
-        #print(f'n_jets: {n_jets}')
+        other_particles = event[event['jet']<0]
+        self.n_jets_dict[event_jets['jet'].nunique()] += 1
+        self.n_other_dict[other_particles['jet'].nunique()] += 1
 
-        # Check di-jet criteria -- require leading jet >10 GeV, subleading jet > 5 GeV
+        # Check di-jet criteria -- require leading jet >10 GeV, subleading jet > 5 GeV, third jet < 4 GeV
         good_event = False
 
         event_jets = [jet for _,jet in event_jets.groupby(['jet'])]
         jet_id_list = [jet['jet'].iloc[0] for jet in event_jets]
         proc_list = [jet['proc'].iloc[0] for jet in event_jets]
         jet_pt_list = [jet['jetpT'].iloc[0] for jet in event_jets]
-        #print(f'jet_id_list: {jet_id_list}')
-        #print(f'jet_pt_list: {jet_pt_list}')
         if jet_pt_list != sorted(jet_pt_list, reverse=True):
             sys.exit('ERROR: jets are not ordered by pt!')
 
         if len(jet_pt_list) > 1:
+            # Check the di-jet condition
             if jet_pt_list[0] > self.leading_jet_pt_min and jet_pt_list[1] > self.subleading_jet_pt_min:
-                good_event = True
+
+                # If there is a third jet, check that its pt is not too close to the second jet
+                if len(jet_pt_list) > 2:
+                    if jet_pt_list[2] < self.third_jet_pt_max:
+                        good_event = True
+                else:
+                    good_event = True
 
         # For jets that pass, construct a dataframe of requested particle_input_type
         if good_event:
@@ -704,8 +714,8 @@ class AnalyzeFlavor(common_base.CommonBase):
             elif particle_input_type == 'leading+subleading':
                 event = event[(event.jet == jet_id_list[0]) | (event.jet == jet_id_list[1])]
             elif particle_input_type == 'all':
-                event = event
-            #print(event)
+                # If there is a third jet, remove it -- since it is duplicated in the jet_id=-1 particles
+                event = event[(event.jet == jet_id_list[0]) | (event.jet == jet_id_list[1]) | (event.jet < 0)]
 
             # Set jetPt to the leading jet pt and set and class label for all rows
             event['jetpT'] = jet_pt_list[0]
@@ -717,11 +727,6 @@ class AnalyzeFlavor(common_base.CommonBase):
         # Otherwise, return an empty dataframe
         else:
             event = event.iloc[:0,:].copy()
-        
-        #print(f'good_event: {good_event}')
-        #print(event)
-        #print()
-        #print()
 
         return event
 

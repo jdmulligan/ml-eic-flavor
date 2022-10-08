@@ -4,6 +4,7 @@ classes: 'qq --> qq_qqbar --> qqbar_gg --> qqbar_transverse PGF_longitudinal PGF
 
 leading_jet_pt_min: 8.
 subleading_jet_pt_min: 5. 
+third_jet_pt_max: 4.
 particle_input: ['leading']    # Loop over different sets of input particles: leading jet, leading+subleading jets, all particles
 kappa: [0.3, 0.5, 0.7]
 
