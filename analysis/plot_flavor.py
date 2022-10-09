@@ -158,9 +158,9 @@ class PlotFlavor(common_base.CommonBase):
                 if 'direct_resolved' in self.config_file:
                     models = [pfn_pid_label, pfn_nopid_label]
                 elif '_s' in self.config_file:
-                    models = [pfn_charge_label, pfn_pid_label, pfn_nopid_label, pfn_mass_label]
+                    models = [pfn_pid_label, pfn_charge_label, pfn_nopid_label, pfn_mass_label]
                 else:
-                    models = [pfn_charge_label, pfn_pid_label, pfn_nopid_label]
+                    models = [pfn_pid_label, pfn_charge_label, pfn_nopid_label]
 
                 roc_list = {}
                 for model in models:
@@ -186,7 +186,7 @@ class PlotFlavor(common_base.CommonBase):
 
             # Plot all particle_pt_min for either pid/charge/nopid
             type='varied_ptmin'
-            pfn_labels = ['charge', 'pid', 'nopid']
+            pfn_labels = ['pid', 'charge', 'nopid']
             for pfn_label in pfn_labels:
 
                 roc_list = {}
@@ -204,7 +204,7 @@ class PlotFlavor(common_base.CommonBase):
         #--------------------------
         # Plot combination of all possible particle_input_types in a single plot
         type = 'in_vs_out'
-        pfn_labels = ['charge', 'pid', 'nopid']
+        pfn_labels = ['pid', 'charge', 'nopid']
         if len(list(self.roc_curve_dict.keys())) > 1:
             print('Plotting combination of all possible particle_input_types in a single plot...')
             for pfn_label in pfn_labels:
@@ -223,7 +223,7 @@ class PlotFlavor(common_base.CommonBase):
         #--------------------------
         # Plot overlay of different minpt constituent cuts for all possible particle_input_types in a single plot
         type = 'in_vs_out'
-        pfn_labels = ['charge', 'pid', 'nopid']
+        pfn_labels = ['pid', 'charge', 'nopid']
         if len(list(self.roc_curve_dict.keys())) > 1:
             print('Plotting overlay of different minpt constituent cuts for all possible particle_input_types in a single plot...')
             for pfn_label in pfn_labels:
@@ -254,7 +254,7 @@ class PlotFlavor(common_base.CommonBase):
                 pfn_nopid_label = f'pfn_nopid_minpt{particle_pt_min}'
                 efn_label = f'efn_minpt{particle_pt_min}'
                 mass_label = f'jet_mass_ptmin{particle_pt_min}'
-                models = [pfn_charge_label, pfn_pid_label, pfn_nopid_label, efn_label, mass_label]
+                models = [pfn_pid_label, pfn_charge_label, pfn_nopid_label, efn_label, mass_label]
 
                 roc_list = {}
                 for model in models:
@@ -278,13 +278,18 @@ class PlotFlavor(common_base.CommonBase):
         if metric == 'ROC':
             plt.axis([0, 1, 0, 1])
             plt.plot([0, 1], [0, 1], 'k--') # dashed diagonal
+            legend_location = 'lower right'
         elif metric == 'PR':
             class_count_dict = self.class_count_dict[particle_input_type]
             class_count_sum = class_count_dict['0'] + class_count_dict['1']
             if positive_label == 'positive_label0':
                 positive_fraction = class_count_dict['0'] / class_count_sum
+                legend_location = 'lower right'
             elif positive_label == 'positive_label1':
                 positive_fraction = class_count_dict['1'] / class_count_sum
+                plt.axis([0, 1., 0.01, 50.])
+                plt.yscale('log')
+                legend_location = 'upper right'
             else:
                 sys.exit(f'ERROR: positive_label = {positive_label}')
             plt.plot([0, 1], [positive_fraction, positive_fraction], 'k--') # dashed horizontal line
@@ -307,7 +312,7 @@ class PlotFlavor(common_base.CommonBase):
                     if 'charge' in label:
                         title_label = '      w/charge'
                     elif 'nopid' in label:
-                        title_label = '      w/o PID'
+                        title_label = '      w/o PID,charge'
                     elif 'pid' in label:
                         title_label = '      w/PID'
             title += title_label
@@ -323,7 +328,7 @@ class PlotFlavor(common_base.CommonBase):
                     if 'charge' in label:
                         title_label = '      w/charge'
                     elif 'nopid' in label:
-                        title_label = '      w/o PID'
+                        title_label = '      w/o PID,charge'
                     elif 'pid' in label:
                         title_label = '      w/PID'
                     if not in_vs_out_overlay:
@@ -365,7 +370,7 @@ class PlotFlavor(common_base.CommonBase):
                     if 'charge' in label:
                         label = 'Particle Flow Network (w/ charge)'
                     elif 'nopid' in label:
-                        label = 'Particle Flow Network (w/o PID)'
+                        label = 'Particle Flow Network (w/o PID,charge)'
                     elif 'pid' in label:
                         label = 'Particle Flow Network (w/ PID)'
                 elif type == 'in_vs_out':
@@ -483,8 +488,8 @@ class PlotFlavor(common_base.CommonBase):
             plt.plot(x, y, linewidth=linewidth, label=label,
                      linestyle=linestyle, alpha=alpha, color=color)
                     
-        legend_fontsize = 10
-        plt.legend(loc='lower right', fontsize=legend_fontsize)
+        legend_fontsize = 9
+        plt.legend(loc=legend_location, fontsize=legend_fontsize)
 
         plt.tight_layout()
         if metric == 'ROC':
