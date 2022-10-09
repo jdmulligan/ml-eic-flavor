@@ -45,6 +45,14 @@ class PlotFlavor(common_base.CommonBase):
         
         self.positive_labels = ['positive_label0', 'positive_label1']
 
+        self.formatted_class_labels = { 'u': 'u',
+                                        'd': 'd',
+                                        's': 's',
+                                        'c': 'c',
+                                        'u_d': 'u,d',
+                                        'u_d_s': 'u,d,s',
+        }
+
         self.plot_title = True
                 
     #---------------------------------------------------------------
@@ -324,20 +332,19 @@ class PlotFlavor(common_base.CommonBase):
         if self.plot_title:
             plt.title(title, fontsize=14)
 
+        # Axis labels
+        if positive_label == 'positive_label0':
+            positive_axis_label = self.formatted_class_labels[self.class1_label]
+            negative_axis_label = self.formatted_class_labels[self.class2_label]
+        elif positive_label == 'positive_label1':
+            positive_axis_label = self.formatted_class_labels[self.class2_label]
+            negative_axis_label = self.formatted_class_labels[self.class1_label]
         if metric == 'ROC':
-            if positive_label == 'positive_label0':
-                plt.xlabel(f'False {self.class1_label} Rate', fontsize=16)
-                plt.ylabel(f'True {self.class1_label} Rate', fontsize=16)
-            elif positive_label == 'positive_label1':
-                plt.xlabel(f'False {self.class2_label} Rate', fontsize=16)
-                plt.ylabel(f'True {self.class2_label} Rate', fontsize=16)
+            plt.xlabel(rf'False Positive Rate = $\frac{{ \mathrm{{False}}\;{positive_axis_label} }}{{ \mathrm{{Total}}\;{negative_axis_label} }}$', fontsize=16) # FPR = FP / (Total N)
+            plt.ylabel(rf'True Positive Rate = $\frac{{ \mathrm{{True}}\;{positive_axis_label} }}{{ \mathrm{{Total}}\;{positive_axis_label} }}$', fontsize=16) # FPR = FP / (Total N)
         elif metric == 'PR':
-            if positive_label == 'positive_label0':
-                plt.xlabel(f'{self.class1_label} Recall', fontsize=16)
-                plt.ylabel(f'{self.class1_label} Precision', fontsize=16)
-            elif positive_label == 'positive_label1':
-                plt.xlabel(f'{self.class2_label} Recall', fontsize=16)
-                plt.ylabel(f'{self.class2_label} Precision', fontsize=16)
+            plt.xlabel(rf'Recall = $\frac{{ \mathrm{{True}}\;{positive_axis_label} }}{{ \mathrm{{Total}}\;{positive_axis_label} }}$', fontsize=16)      # Recall = TPR =  TP / (Total P)
+            plt.ylabel(rf'Precision = $\frac{{ \mathrm{{True}}\;{positive_axis_label} }}{{ \mathrm{{True}}\;{positive_axis_label} + \mathrm{{False}}\;{positive_axis_label} }}$', fontsize=16)   # Precision = TP / (TP + FP)
     
         for label,value in roc_list.items():
             if 'pfn' in label:
