@@ -538,11 +538,7 @@ class AnalyzeFlavor(common_base.CommonBase):
             if self.event_type == 'dis':
                 jet_df = jet_df.groupby(['event'], as_index=False).apply(self.preprocess_dis_event, particle_input_type).reset_index(drop=True)
             elif self.event_type == 'photoproduction':
-                self.n_jets_dict = {x:0 for x in range(0,5)}
-                self.n_other_dict = {x:0 for x in range(0,5)}
                 jet_df = jet_df.groupby(['event'], as_index=False).apply(self.preprocess_photoproduction_event, particle_input_type).reset_index(drop=True)
-                print(f'number of positive jet ids per event: {self.n_jets_dict}')
-                print(f'number of negative jet ids per event: {self.n_other_dict}')
             print(f'time to run preprocess_event(): {time.time()-start}')
 
             # For DIS jets, set jet indices for out-of-jet particles to be the same as the in-jet particles
@@ -681,17 +677,11 @@ class AnalyzeFlavor(common_base.CommonBase):
     #---------------------------------------------------------------
     def preprocess_photoproduction_event(self, event, particle_input_type):
 
-        event_jets = event[event['jet']>0]
-        other_particles = event[event['jet']<0]
-        self.n_jets_dict[event_jets['jet'].nunique()] += 1
-        self.n_other_dict[other_particles['jet'].nunique()] += 1
-
         # Check di-jet criteria -- require leading jet >10 GeV, subleading jet > 5 GeV, third jet < 4 GeV
         good_event = False
 
+        event_jets = event[event['jet']>0]
         event_jets = [jet for _,jet in event_jets.groupby(['jet'])]
-        jet_id_list = [jet['jet'].iloc[0] for jet in event_jets]
-        proc_list = [jet['proc'].iloc[0] for jet in event_jets]
         jet_pt_list = [jet['jetpT'].iloc[0] for jet in event_jets]
         if jet_pt_list != sorted(jet_pt_list, reverse=True):
             sys.exit('ERROR: jets are not ordered by pt!')
@@ -709,6 +699,9 @@ class AnalyzeFlavor(common_base.CommonBase):
 
         # For jets that pass, construct a dataframe of requested particle_input_type
         if good_event:
+
+            jet_id_list = [jet['jet'].iloc[0] for jet in event_jets]
+
             if particle_input_type == 'leading':
                 event = event[event.jet == jet_id_list[0]]
             elif particle_input_type == 'leading+subleading':
@@ -719,7 +712,7 @@ class AnalyzeFlavor(common_base.CommonBase):
 
             # Set jetPt to the leading jet pt and set and class label for all rows
             event['jetpT'] = jet_pt_list[0]
-            event['proc'] = proc_list[0]
+            event['proc'] = event_jets[0]['proc'].iloc[0]
 
             # Reset the ct index
             event['ct'] = range(1, len(event.index)+1)
