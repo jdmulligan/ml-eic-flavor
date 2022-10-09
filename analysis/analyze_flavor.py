@@ -644,7 +644,7 @@ class AnalyzeFlavor(common_base.CommonBase):
 
         # Group and convert to array
         jet_list = jet_df_zero_padded.groupby(level=0).apply(lambda x: x.values.tolist()).tolist()                                                                                                               
-        jet_array = np.array(jet_list)
+        jet_array = np.array(jet_list, dtype=np.float32)
         print(f'(n_jets, n_particles, n_particle_info) = {jet_array.shape}')
 
         return jet_array, labels, class_array
@@ -1115,6 +1115,8 @@ class AnalyzeFlavor(common_base.CommonBase):
     
         # Convert labels to categorical
         Y_PFN = energyflow.utils.to_categorical(y, num_classes=2)
+
+        print(f'X_particles size: {X_particles.nbytes} ({X_particles.dtype})')
                         
         # (pt, z, eta, phi, m, pid, charge)
         if charge:
