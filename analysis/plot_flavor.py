@@ -51,6 +51,10 @@ class PlotFlavor(common_base.CommonBase):
                                         'c': 'c',
                                         'u_d': 'u,d',
                                         'u_d_s': 'u,d,s',
+                                        '$qq/q\\bar{q}$': 'qq,q\\bar{{q}}',
+                                        '$gg$': 'gg',
+                                        'direct': 'direct',
+                                        'resolved': 'resolved',
         }
 
         self.plot_title = True
@@ -77,8 +81,12 @@ class PlotFlavor(common_base.CommonBase):
             self.dmax = config['dmax']
 
         if self.event_type == 'photoproduction':
-            self.class1_label = r'$qq/q\bar{q}$'
-            self.class2_label = r'$gg$'
+            if 'q_g' in self.config_file:
+                self.class1_label = r'$qq/q\bar{q}$'
+                self.class2_label = r'$gg$'
+            elif 'direct_resolved' in self.config_file:
+                self.class1_label = r'direct'
+                self.class2_label = r'resolved'
         elif self.event_type == 'dis':
             self.classes = config['classes']
             class_labels = self.classes.split('__')
@@ -341,7 +349,8 @@ class PlotFlavor(common_base.CommonBase):
 
                 if self.event_type == 'photoproduction':
                     mass_label = f'jet_mass_ptmin{particle_pt_min}'
-                    roc_list[mass_label] = results[particle_input_type][mass_label]
+                    if mass_label in roc_list:
+                        roc_list[mass_label] = results[particle_input_type][mass_label]
 
                 if self.class2_label == 's':
                     strange_tagger_label = f'strange_tagger_ptmin{particle_pt_min}'
@@ -407,9 +416,41 @@ class PlotFlavor(common_base.CommonBase):
                                 roc_list[f'{model}_{particle_input_type}'] = results[particle_input_type][model]
 
                 charge_label = f'jet_charge_ptmin0_k0.3'
-                roc_list[charge_label] = results['in'][charge_label]
+                if charge_label in roc_list:
+                    roc_list[charge_label] = results['in'][charge_label]
 
                 self.plot_roc_curves(metric, roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, in_vs_out_overlay=True, outputdir=self.output_dir_dict[self.particle_input_type_list[0]], positive_label='positive_label1')
+
+        #--------------------------
+        # Plot q/g (photoproduction w/leading jet): PFN, EFN, EFPs, mass
+        if self.event_type == 'photoproduction' and self.particle_input_type_list[0] == 'leading':
+            print('Plotting q/g (photoproduction w/leading jet): PFN, EFN, EFPs, mass...')
+
+            type = 'fixed_ptmin'
+            for particle_pt_min in self.particle_pt_min_list:
+
+                pfn_charge_label = f'pfn_charge_minpt{particle_pt_min}'
+                pfn_pid_label = f'pfn_pid_minpt{particle_pt_min}'
+                pfn_nopid_label = f'pfn_nopid_minpt{particle_pt_min}'
+                efn_label = f'efn_minpt{particle_pt_min}'
+                mass_label = f'jet_mass_ptmin{particle_pt_min}'
+                models = [pfn_pid_label, pfn_charge_label, pfn_nopid_label, efn_label, mass_label]
+
+                roc_list = {}
+                for model in models:
+                    if model in list(results[self.particle_input_type_list[0]].keys()):
+                        roc_list[model] = results[self.particle_input_type_list[0]][model]
+
+                if particle_pt_min == 0:
+                    for d in range(3, self.dmax+1):
+                        efp_linear_label = f'efp_linear_minpt0_d{d}'
+                        efp_dnn_label = f'efp_dnn_minpt0_d{d}'
+                        if efp_linear_label in roc_list:
+                            roc_list[efp_linear_label] = results[self.particle_input_type_list[0]]['efp_linear_minpt0'][d]
+                        if efp_dnn_label in roc_list:
+                            roc_list[efp_dnn_label] = results[self.particle_input_type_list[0]]['efp_dnn_minpt0'][d]
+
+                self.plot_roc_curves(metric, roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, outputdir=self.output_dir_dict[particle_input_type], positive_label='positive_label1')
 
     #--------------------------------------------------------------- 
     # Plot ROC curves
@@ -437,7 +478,13 @@ class PlotFlavor(common_base.CommonBase):
 
         plt.grid(True)
 
-        title = rf'${self.formatted_class_labels[self.class1_label]}$ vs. ${self.formatted_class_labels[self.class2_label]}$ jets'
+
+        title = rf'${self.formatted_class_labels[self.class1_label]}$ vs. ${self.formatted_class_labels[self.class2_label]}$'
+        if self.event_type == 'photoproduction':
+            title += ' process'
+        else:
+            title += ' jets'
+
         title_label = ''
         if type == 'fixed_ptmin':
             for label,value in roc_list.items():
