@@ -464,7 +464,9 @@ class AnalyzeFlavor(common_base.CommonBase):
 
         for i,input_file in enumerate(self.input_files):
             print(f'    Loading file {i+1}/{len(self.input_files)}...')
-
+            if not os.path.exists(input_file):
+                continue
+            
             jet_df = pd.read_csv(input_file, sep='\s+')
             X_particles, y, class_array = self.create_jet_array(jet_df, jet_pt_min, particle_input_type)
             print(f'    X_particles shape: {X_particles.shape}')
