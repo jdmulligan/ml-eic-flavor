@@ -89,7 +89,7 @@ class PlotFlavor(common_base.CommonBase):
         if self.event_type == 'photoproduction':
             self.reference_particle_input_types = ['leading', 'leading+subleading', 'all']
         elif self.event_type == 'dis':
-            self.reference_particle_input_types = ['in', 'out', 'in+out']
+            self.reference_particle_input_types = ['in', 'out', 'in+out', 'in_decay10cm']
 
         self.particle_pt_min_list = config['particle_pt_min_list']
 
@@ -122,6 +122,19 @@ class PlotFlavor(common_base.CommonBase):
                         self.AUC_dict[particle_input_type] = pickle.load(f)
                         if not 'u_d_' in self.output_dir:
                             self.class_count_dict[particle_input_type] = pickle.load(f)
+
+                # For ud vs. s, try to load the ctau=10cm results as well
+                if '_s' in self.config_file:
+                    outputdir_decay10cm = 'results_20221008/ud_s_decay10cm_unbalanced'
+                    particle_input_type_new = f'{particle_input_type}_decay10cm'
+                    self.output_dir_dict[particle_input_type_new] = os.path.join(outputdir_decay10cm, f'pt{jet_pt_min}_{particle_input_type}')
+                    roc_filename = os.path.join(self.output_dir_dict[particle_input_type_new], f'ROCpt{jet_pt_min}_{particle_input_type}.pkl')
+                    if os.path.exists(roc_filename):
+                        with open(roc_filename, 'rb') as f:
+                            self.roc_curve_dict[particle_input_type_new] = pickle.load(f)
+                            self.precision_recall_dict[particle_input_type_new] = pickle.load(f)
+                            self.AUC_dict[particle_input_type_new] = pickle.load(f)
+                            self.class_count_dict[particle_input_type_new] = pickle.load(f)
 
             print(f'We found output directories for the following: {list(self.roc_curve_dict.keys())}')
 
@@ -159,39 +172,47 @@ class PlotFlavor(common_base.CommonBase):
             type = 'fixed_ptmin'
             for particle_pt_min in self.particle_pt_min_list:
 
-                pfn_charge_label = f'pfn_charge_minpt{particle_pt_min}'
-                pfn_pid_label = f'pfn_pid_minpt{particle_pt_min}'
-                pfn_nopid_label = f'pfn_nopid_minpt{particle_pt_min}'
-                pfn_mass_label = f'pfn_mass_minpt{particle_pt_min}'
-                if 'direct_resolved' in self.config_file:
-                    models = [pfn_pid_label, pfn_nopid_label]
-                elif '_s' in self.config_file:
-                    models = [pfn_pid_label, pfn_charge_label, pfn_nopid_label, pfn_mass_label]
-                else:
-                    models = [pfn_pid_label, pfn_charge_label, pfn_nopid_label]
+                    pfn_pid_label = f'pfn_pid_minpt{particle_pt_min}'
+                    pfn_decay10cm_label = f'pfn_pid_minpt{particle_pt_min}_decay10cm'
+                    pfn_charge_label = f'pfn_charge_minpt{particle_pt_min}'
+                    pfn_nopid_label = f'pfn_nopid_minpt{particle_pt_min}'
+                    pfn_mass_label = f'pfn_mass_minpt{particle_pt_min}'
+                    if 'direct_resolved' in self.config_file:
+                        models = [pfn_pid_label, pfn_nopid_label]
+                    elif '_s' in self.config_file:
+                        models = [pfn_pid_label, pfn_decay10cm_label, pfn_charge_label, pfn_nopid_label, pfn_mass_label]
+                    else:
+                        models = [pfn_pid_label, pfn_charge_label, pfn_nopid_label]
 
-                roc_list = {}
-                for model in models:
-                    if model in list(results[particle_input_type].keys()):
-                        roc_list[model] = results[particle_input_type][model]
+                    roc_list = {}
+                    for model in models:
+                        if 'decay10cm' in model:
+                            if pfn_pid_label in results['in_decay10cm']:
+                                roc_list[pfn_decay10cm_label] = results['in_decay10cm'][pfn_pid_label]
+                        else:
+                            if model in results[particle_input_type].keys():
+                                roc_list[model] = results[particle_input_type][model]
 
-                if self.event_type == 'dis':
-                    for kappa in self.kappa:
-                        charge_label = f'jet_charge_ptmin{particle_pt_min}_k{kappa}'
-                        roc_list[charge_label] = results[particle_input_type][charge_label]
+                    if self.event_type == 'dis':
+                        for kappa in self.kappa:
+                            charge_label = f'jet_charge_ptmin{particle_pt_min}_k{kappa}'
+                            if charge_label in results[particle_input_type].keys():
+                                roc_list[charge_label] = results[particle_input_type][charge_label]
 
-                if self.event_type == 'photoproduction':
-                    mass_label = f'jet_mass_ptmin{particle_pt_min}'
-                    roc_list[mass_label] = results[particle_input_type][mass_label]
+                    if self.event_type == 'photoproduction':
+                        mass_label = f'jet_mass_ptmin{particle_pt_min}'
+                        if mass_label in results[particle_input_type].keys():
+                            roc_list[mass_label] = results[particle_input_type][mass_label]
 
-                if self.class2_label == 's':
-                    strange_tagger_label = f'strange_tagger_ptmin{particle_pt_min}'
-                    roc_list[strange_tagger_label] = results[particle_input_type][strange_tagger_label]
+                    if self.class2_label == 's':
+                        strange_tagger_label = f'strange_tagger_ptmin{particle_pt_min}'
+                        if strange_tagger_label in results[particle_input_type].keys():
+                            roc_list[strange_tagger_label] = results[particle_input_type][strange_tagger_label]
 
-                if len(list(roc_list.keys())) > 1:
-                    print('Plotting pid vs. charge vs. nopid for each particle_pt_min...')
-                    self.plot_roc_curves(metric, roc_list, jet_pt_min, particle_input_type, type=type, outputdir=self.output_dir_dict[particle_input_type], positive_label=positive_label)
-
+                    if len(list(roc_list.keys())) > 1:
+                        print('Plotting pid vs. charge vs. nopid for each particle_pt_min...')
+                        self.plot_roc_curves(metric, roc_list, jet_pt_min, particle_input_type, type=type, outputdir=self.output_dir_dict[particle_input_type], positive_label=positive_label)
+                        
             # Plot all particle_pt_min for either pid/charge/nopid
             type='varied_ptmin'
             pfn_labels = ['pid', 'charge', 'nopid']
@@ -417,6 +438,7 @@ class PlotFlavor(common_base.CommonBase):
         plt.grid(True)
 
         title = rf'${self.formatted_class_labels[self.class1_label]}$ vs. ${self.formatted_class_labels[self.class2_label]}$ jets'
+        title_label = ''
         if type == 'fixed_ptmin':
             for label,value in roc_list.items():
                 if 'pfn' in label:
@@ -476,18 +498,23 @@ class PlotFlavor(common_base.CommonBase):
                 if in_vs_out_overlay and minpt == '0.4':
                     linewidth = 2
                     alpha = 1
-                    #linestyle = 'dotted'
+                elif 'decay10cm' in label:
+                    linewidth = 4
+                    alpha = 0.5
+                    linestyle = 'dotted'
                 else:
                     linewidth = 4
                     alpha = 0.5
 
                 if type == 'fixed_ptmin':
-                    if 'charge' in label:
+                    if 'decay10cm' in label:
+                        label = r'Particle Flow Network (w/ PID), $c\tau>10$ cm'
+                    elif 'charge' in label:
                         label = 'Particle Flow Network (w/ charge)'
                     elif 'nopid' in label:
                         label = 'Particle Flow Network (w/o PID,charge)'
                     elif 'pid' in label:
-                        label = 'Particle Flow Network (w/ PID)'
+                        label = 'Particle Flow Network (w/ PID)' 
                 elif type == 'in_vs_out':
                     input_type = label.rsplit('_')[3]
                     if in_vs_out_overlay:
@@ -605,6 +632,8 @@ class PlotFlavor(common_base.CommonBase):
 
         if 'u_d_' in self.output_dir and type in ['varied_ptmin']:            
             legend_fontsize = 10
+        elif '_s' in self.output_dir:
+            legend_fontsize = 8
         else:
             legend_fontsize = 9
         plt.legend(loc=legend_location, fontsize=legend_fontsize)
