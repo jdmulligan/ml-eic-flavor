@@ -472,7 +472,7 @@ class PlotFlavor(common_base.CommonBase):
                 legend_location = 'lower right'
             elif positive_label == 'positive_label1':
                 positive_fraction = class_count_dict['1'] / class_count_sum
-                plt.axis([0, 1., 0.01, 50.])
+                plt.axis([0, 1., 0.01, 2.])
                 plt.yscale('log')
                 legend_location = 'upper right'
             else:
@@ -489,6 +489,7 @@ class PlotFlavor(common_base.CommonBase):
             title += ' jets'
 
         title_label = ''
+        minpt = None
         if type == 'fixed_ptmin':
             for label,value in roc_list.items():
                 if 'pfn' in label:
@@ -701,7 +702,8 @@ class PlotFlavor(common_base.CommonBase):
             legend_fontsize = 8
         else:
             legend_fontsize = 9
-        plt.legend(loc=legend_location, fontsize=legend_fontsize, title=legend_title, title_fontsize=12)
+        if metric == 'ROC':
+            plt.legend(loc=legend_location, fontsize=legend_fontsize, title=legend_title, title_fontsize=12)
 
         suffix = type
         if type == 'fixed_ptmin':
