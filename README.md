@@ -1,5 +1,22 @@
 # Running the code
 
+The analysis workflow is as follows:
+
+1. Setup the software environment. A couple example instructions are below; adapt them as appropriate.
+
+2. Create a config file. There are examples for all studies in the `config` directory, e.g. e.g. `config/ud_s.yaml`. In particular, you will want to:
+    - Download the data and set the paths of the training files under `input_files`
+    - Set the event type and training classes
+    - Set `models` to contain the ML architectures you want to include, and edit the config blocks for each model as desired
+    - Edit other settings as desired. See the examples for further details.
+   
+3. Fit model and make plots:
+   ```
+   cd ml-eic-flavor
+   python analysis/analyze_flavor.py -c config/my_config.yaml -o <output_dir>
+   ```
+   The `-o` path is the location that the output plots will be written to. 
+
 ## Setup software environment – on hiccup cluster
 <details>
   <summary>Click for details</summary>
@@ -78,24 +95,6 @@ source init_perlmutter.sh
 Now we are ready to run our scripts.
 
 </details>
-
-## q-g jets from Kyle
-
-The jet samples are located in the `training_data` folder.
-
-The analysis workflow is as follows:
-
-1. Edit the config file `config/qg.yaml`. In particular:
-    - Set `n_train, n_val, n_test` to the desired size of the training sample
-    - Set `models` to contain the ML architectures you want to include
-    - Edit the config blocks for each model as desired
-   
-2. Fit model and make plots:
-   ```
-   cd ml-eic-flavor
-   python analysis/analyze_flavor.py -c config/qg.yaml -o <output_dir>
-   ```
-   The `-o` path is the location that the output plots will be written to. 
 
 # Pull requests
 
