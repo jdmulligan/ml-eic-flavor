@@ -217,7 +217,7 @@ class PlotFlavor(common_base.CommonBase):
                         if strange_tagger_label in results[particle_input_type].keys():
                             roc_list[strange_tagger_label] = results[particle_input_type][strange_tagger_label]
 
-                    if len(list(roc_list.keys())) > 1:
+                    if len(list(roc_list.keys())) > 1 or 'direct_resolved' in self.output_dir:
                         print('Plotting pid vs. charge vs. nopid for each particle_pt_min...')
                         self.plot_roc_curves(metric, roc_list, jet_pt_min, particle_input_type, type=type, outputdir=self.output_dir_dict[particle_input_type], positive_label=positive_label)
                         
@@ -290,8 +290,7 @@ class PlotFlavor(common_base.CommonBase):
                 pfn_pid_label = f'pfn_pid_minpt{particle_pt_min}'
                 pfn_nopid_label = f'pfn_nopid_minpt{particle_pt_min}'
                 efn_label = f'efn_minpt{particle_pt_min}'
-                mass_label = f'jet_mass_ptmin{particle_pt_min}'
-                models = [pfn_pid_label, pfn_charge_label, pfn_nopid_label, efn_label, mass_label]
+                models = [pfn_pid_label, efn_label]
 
                 roc_list = {}
                 for model in models:
@@ -299,13 +298,17 @@ class PlotFlavor(common_base.CommonBase):
                         roc_list[model] = results[self.particle_input_type_list[0]][model]
 
                 if particle_pt_min == 0:
-                    for d in range(3, self.dmax+1):
-                        efp_linear_label = f'efp_linear_minpt0_d{d}'
+                    for d in range(7, self.dmax+1, 2):
+                        #efp_linear_label = f'efp_linear_minpt0_d{d}'
                         efp_dnn_label = f'efp_dnn_minpt0_d{d}'
-                        roc_list[efp_linear_label] = results[self.particle_input_type_list[0]]['efp_linear_minpt0'][d]
+                        #roc_list[efp_linear_label] = results[self.particle_input_type_list[0]]['efp_linear_minpt0'][d]
                         roc_list[efp_dnn_label] = results[self.particle_input_type_list[0]]['efp_dnn_minpt0'][d]
 
-                self.plot_roc_curves(metric, roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, outputdir=self.output_dir_dict[particle_input_type], positive_label=positive_label)
+                mass_label = f'jet_mass_ptmin{particle_pt_min}'
+                if mass_label in list(results[self.particle_input_type_list[0]].keys()):
+                    roc_list[mass_label] = results[self.particle_input_type_list[0]][mass_label]
+
+                self.plot_roc_curves(metric, roc_list, jet_pt_min, self.particle_input_type_list[0], type=type, outputdir=self.output_dir_dict[self.particle_input_type_list[0]], positive_label=positive_label)
 
     #---------------------------------------------------------------
     # Plot several versions of ROC curves
@@ -478,8 +481,8 @@ class PlotFlavor(common_base.CommonBase):
 
         plt.grid(True)
 
-
         title = rf'${self.formatted_class_labels[self.class1_label]}$ vs. ${self.formatted_class_labels[self.class2_label]}$'
+        legend_title = ''
         if self.event_type == 'photoproduction':
             title += ' process'
         else:
@@ -518,8 +521,6 @@ class PlotFlavor(common_base.CommonBase):
                         title_label = '      w/o PID,charge'
                     elif 'pid' in label:
                         title_label = '      w/PID'
-        if self.plot_title:
-            plt.title(title, fontsize=14)
 
         # Axis labels
         if positive_label == 'positive_label0':
@@ -536,6 +537,17 @@ class PlotFlavor(common_base.CommonBase):
             plt.ylabel(rf'Precision = $\frac{{ \mathrm{{True}}\;{positive_axis_label} }}{{ \mathrm{{True}}\;{positive_axis_label} + \mathrm{{False}}\;{positive_axis_label} }}$', fontsize=16)   # Precision = TP / (TP + FP)
     
         for label,value in roc_list.items():
+
+            if metric == 'ROC':
+                x = value[0] # FPR
+                y = value[1] # TPR
+                if 'efn' in label or 'efp_dnn' in label: # Need to flip ROC curve, since we inverted it in analysis code
+                    x = 1-x
+                    y = 1-y
+            elif metric == 'PR':
+                x = value[1] # Recall
+                y = value[0] # Precision
+
             if 'pfn' in label:
 
                 minpt = label.rsplit('_')[2][5:]
@@ -585,7 +597,7 @@ class PlotFlavor(common_base.CommonBase):
                         elif input_type == 'leading+subleading':
                             label = f'Leading jet + subleading jet'
                         elif input_type == 'all':
-                            label = rf'All jets with $p_{{T,\mathrm{{jet}}}}>2$ GeV'
+                            label = rf'All event particles'
                         else:
                             label += f', {input_type}'
                 else:
@@ -617,6 +629,15 @@ class PlotFlavor(common_base.CommonBase):
                     linewidth = 4
                     alpha = 0.5
                     label = rf'Energy Flow Polynomials (DNN), $d={d}$'
+
+                legend_title = 'Leading jet'
+
+                title = r'$q$ vs. $g$ jet'
+                positive_axis_label = 'q'
+                negative_axis_label = 'g'
+
+                plt.xlabel(rf'False Positive Rate = $\frac{{ \mathrm{{False}}\;{positive_axis_label} }}{{ \mathrm{{Total}}\;{negative_axis_label} }}$', fontsize=16) # FPR = FP / (Total N)
+                plt.ylabel(rf'True Positive Rate = $\frac{{ \mathrm{{True}}\;{positive_axis_label} }}{{ \mathrm{{Total}}\;{positive_axis_label} }}$', fontsize=16) # FPR = FP / (Total N)
 
             elif 'jet_charge' in label:
                 linewidth = 4
@@ -668,14 +689,11 @@ class PlotFlavor(common_base.CommonBase):
                     minpt = '0.1'
                 label += rf'   ($p_{{T,\mathrm{{particle}}}}>{minpt}$ GeV)'
 
-            if metric == 'ROC':
-                x = value[0] # FPR
-                y = value[1] # TPR
-            elif metric == 'PR':
-                x = value[1] # Recall
-                y = value[0] # Precision
             plt.plot(x, y, linewidth=linewidth, label=label,
                      linestyle=linestyle, alpha=alpha, color=color)
+
+        if self.plot_title:
+            plt.title(title, fontsize=14)
 
         if 'u_d_' in self.output_dir and type in ['varied_ptmin']:            
             legend_fontsize = 10
@@ -683,7 +701,7 @@ class PlotFlavor(common_base.CommonBase):
             legend_fontsize = 8
         else:
             legend_fontsize = 9
-        plt.legend(loc=legend_location, fontsize=legend_fontsize)
+        plt.legend(loc=legend_location, fontsize=legend_fontsize, title=legend_title, title_fontsize=12)
 
         suffix = type
         if type == 'fixed_ptmin':
@@ -700,7 +718,8 @@ class PlotFlavor(common_base.CommonBase):
             suffix += f'_{s}'
 
         plt.tight_layout()
-        plt.savefig(os.path.join(outputdir, f'{metric}{self.plot_index[metric][particle_input_type]}_{suffix}_poslabel{positive_label[-1]}.pdf'))
+        filename = os.path.join(outputdir, f'{metric}{self.plot_index[metric][particle_input_type]}_{suffix}_poslabel{positive_label[-1]}.pdf')
+        plt.savefig(filename)
         plt.close()
 
         self.plot_index[metric][particle_input_type] += 1
@@ -724,10 +743,14 @@ class PlotFlavor(common_base.CommonBase):
                 color = sns.xkcd_rgb['medium green']
             elif 'efp' in label:
                 if d == '3':
-                    color = sns.xkcd_rgb['watermelon'] 
+                    color = sns.xkcd_rgb['faded purple'] 
                 if d == '4':
-                    color = sns.xkcd_rgb['light brown'] 
+                    color = sns.xkcd_rgb['faded red'] 
                 if d == '5':
+                    color = sns.xkcd_rgb['watermelon'] 
+                if d == '6':
+                    color = sns.xkcd_rgb['light brown'] 
+                if d == '7':
                     color = sns.xkcd_rgb['medium brown']
             elif 'strange_tagger' in label:
                 color = sns.xkcd_rgb['medium green']  
