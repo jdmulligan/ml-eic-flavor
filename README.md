@@ -1,3 +1,9 @@
+# Jet classification at the Electron-Ion Collider
+
+This repository contains analysis code for [arXiv:2210.06450](https://inspirehep.net/literature/2164495), performing classification of high-energy jets at the Electron-Ion Collider using deep sets / point clouds.
+
+The training data sets used in this work can be found [here](10.5281/zenodo.7538810).
+
 # Running the code
 
 The analysis workflow is as follows:
